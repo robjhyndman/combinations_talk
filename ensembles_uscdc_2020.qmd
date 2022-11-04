@@ -1,0 +1,1294 @@
+---
+title: "Forecasting ensembles and combinations"
+author: Rob J Hyndman
+date: "15 November 2022"
+date-format: "D MMMM YYYY"
+abstract: "Forecast combination methods have flourished remarkably over the past 50 years, and are now part of the mainstream of forecasting research and practice. Combining multiple forecasts produced from multiple models is used to improve accuracy through the integration of information gleaned from different sources. Combination schemes have evolved from simple combination methods without estimation, to sophisticated methods involving time-varying weights, nonlinear combinations, correlations among components, and cross-learning. They include combining point forecasts, and combining probabilistic forecasts. I will provide a tutorial review on using forecasting combinations in practice, based on implementations using R. I will highlight the potential and limitations of the available methods, and some suggestions for best practice."
+time: 20 mins
+format:
+  revealjs:
+    slide-number: "c"
+    preview-links: auto
+    fig-format: svg
+    controls: true
+    theme: [default, custom.scss]
+    html-math-method: katex
+    self-contained: true
+    title-slide-attributes:
+      data-background-image: "figs/cover.png"
+      data-background-size: "100% 20%"
+    include-after: |
+      <script src="https://kit.fontawesome.com/0fba9333d8.js" crossorigin="anonymous"></script>
+callout-icon: false
+toc: true
+toc-depth: 1
+toc-title: Outline
+freeze: true
+editor_options:
+  chunk_output_type: console
+---
+
+# What is a forecast?
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  cache = TRUE,
+  dev.args = list(bg = grey(0.9), pointsize = 11)
+)
+options(width=45)
+library(fpp3)
+library(distributional)
+library(gganimate)
+library(stringr)
+library(ggdist)
+library(fontawesome)
+
+set.seed(2020 - 08 - 10)
+
+if (file.exists("cafe.rds")) {
+  cafe <- readRDS("cafe.rds")
+} else {
+  cafe <- readabs::read_abs(cat_no="8501.0", tables=11) %>%
+    filter(str_detect(series, "takeaway")) %>%
+    mutate(
+      state = str_extract(series, "^Turnover ;  ([A-Za-z\\s]*)*"),
+      state = str_trim(str_remove(state, "Turnover ;  ")),
+      state = recode(state,
+        `Australian Capital Territory` = "ACT",
+        `New South Wales` = "NSW",
+        `Northern Territory` = "NT",
+        Queensland = "QLD",
+        `South Australia` = "SA",
+        Tasmania = "TAS",
+        Victoria = "VIC",
+        `Western Australia` = "WA"
+      ),
+      date = yearmonth(date)
+    ) %>%
+    select(date, state, value) %>%
+    filter(state != "Total") %>%
+    rename(turnover = value) %>%
+    filter(
+      date >= yearmonth("2006 Jan"),
+      date <= yearmonth("2019 Dec")
+    ) %>%
+    as_tsibble(index=date, key=state)
+  saveRDS(cafe, "cafe.rds")
+}
+auscafe <- cafe %>%
+  summarise(turnover = sum(turnover))
+localcases <- readRDS("localcases.rds")
+source("functions.R")
+```
+
+```{r samples, echo=FALSE}
+# Training data
+train <- auscafe %>%
+  filter(year(date) <= 2018)
+# Fit ETS model
+fit <- train %>%
+  model(ETS = ETS(turnover))
+# Forecasts
+fc <- fit %>%
+  forecast(h = "1 year")
+# Future sample paths
+future <- fit %>%
+  generate(times = 1000, h = "1 year") %>%
+  as_tibble() %>%
+  mutate(modrep = paste0(.model, .rep))
+# Colours for sample paths. Need to permute to avoid all similar colours on top in graph
+colours <- tibble(modrep = unique(future$modrep)) %>%
+  mutate(col = sample(rainbow(1000)))
+future <- future %>% left_join(colours, by = "modrep")
+```
+
+## Where is Melbourne? {auto-animate="true"}
+
+::: columns
+::: {.column width="65%"}
+![](figs/melbourne-location-on-the-us-map.jpg)
+:::
+:::
+
+## Where is Melbourne? {auto-animate="true"}
+
+::: columns
+::: {.column width="65%"}
+![](figs/melbourne-location-on-the-australia-map.jpg)
+:::
+:::
+
+## Where is Melbourne? {auto-animate="true"}
+
+::: columns
+::: {.column width="65%"}
+![](figs/melbourne-location-on-the-australia-map.jpg)
+:::
+
+::: {.column width="30%"}
+![](figs/coffee.jpg)
+
+![](figs/degraves.jpg)
+:::
+:::
+
+## Australian monthly café turnover {auto-animate="true"}
+
+::: columns
+::: {.column width="85%"}
+```{r data, echo=FALSE, dependson='samples'}
+p1 <- train %>%
+  autoplot(turnover) +
+  labs(
+    x = "Month",
+    y = "Turnover (A$million)",
+    title = "Australian monthly café turnover"
+  ) +
+  guides(colour = FALSE, level = FALSE)
+p1 +
+  geom_line(
+    data = filter(future, as.numeric(.rep) <= 5),
+    aes(y = .sim, col = col, group = c(modrep)),
+    alpha = 0
+  )
+```
+:::
+
+::: {.column width="15%"}
+![](figs/coffee.jpg)
+
+![](figs/degraves.jpg)
+:::
+:::
+
+## Australian monthly café turnover {auto-animate="true"}
+
+```{r data2, echo=FALSE, dependson='samples'}
+p1 +
+  geom_line(
+    data = filter(future, as.numeric(.rep) <= 5),
+    aes(y = .sim, col = col, group = c(modrep)),
+    alpha = 0
+  )
+```
+
+## Australian monthly café turnover
+
+```{r plots2, echo=FALSE, dependson="data"}
+p1 +
+  geom_line(
+    data = filter(future, as.numeric(.rep) <= 5),
+    aes(y = .sim, col = col, group = c(modrep))
+  ) +
+  annotate("text", x=as.Date("2019-06-01"), y=3200, label="ETS futures")
+```
+
+## Australian monthly café turnover
+
+```{r samples2, echo=FALSE, dependson='data'}
+p1$data <- train %>% filter(year(date) >= 2015)
+p1 <- p1 +
+  ylim(min(p1$data$turnover), max(future$.sim))
+p1 +
+  geom_line(
+    data = filter(future, as.numeric(.rep) <= 5),
+    aes(y = .sim, col = col, group = c(modrep)),
+  ) +
+  annotate("text", x=as.Date("2019-06-01"), y=3200, label="ETS futures")
+```
+
+## Australian monthly café turnover
+
+```{r samples2a, echo=FALSE, dependson='samples2'}
+p1 +
+  geom_line(
+    data = filter(future),
+    aes(y = .sim, col = col, group = c(modrep)),
+  ) +
+  annotate("text", x=as.Date("2019-06-01"), y=3200, label="ETS futures")
+```
+
+## Australian monthly café turnover
+
+```{r samples3, echo=FALSE, dependson='samples2'}
+p1 <- p1 +
+  geom_line(
+    data = future,
+    aes(y = .sim, group = modrep),
+    color = "gray", alpha = 0.2
+  ) +
+  annotate("text", x=as.Date("2019-06-01"), y=3200, label="ETS futures", col='gray')
+p1
+```
+
+## Mean (or point) forecast
+
+```{r point, echo=FALSE, dependson='samples3'}
+p1 +
+  autolayer(fc, level = NULL, lwd = 1)
+```
+
+## Interval forecast
+
+```{r interval, echo=FALSE, dependson='samples3'}
+p1 +
+  autolayer(fc, level = 80, lwd = 1)
+```
+
+## Quantile forecasts
+
+```{r quantiles, dependson='samples3'}
+qf <- fit %>%
+  generate(times = 1000, h = "1 year") %>%
+  as_tibble() %>%
+  group_by(date) %>%
+  summarise(
+    qs = quantile(.sim, seq(from = 0.1, to = 0.9, by = 0.1)), prob = seq(from = 0.1, to = 0.9, by = 0.1)
+  )
+p1 <- p1 +
+  geom_line(
+    data = qf,
+    mapping = aes(x = date, y = qs, group = prob),
+    colour = "blue"
+  )
+p1
+```
+
+# Forecasting competitions
+
+## Galton (1907)
+
+:::: {.columns}
+
+::: {.column width="50%"}
+![](figs/galton-0.jpg)
+:::
+
+::: {.column width="35%"}
+![](figs/Francis_Galton2.jpg)
+
+::: {.callout}
+According to the democratic principle of "one vote one value", the middlemost estimate expresses the *vox populi*.
+:::
+:::
+
+::::
+
+
+## Newbold and Granger (1974)
+
+:::: {.columns}
+
+::: {.column width="45%"}
+![](figs/NG.png)
+:::
+
+::: {.column width="50%"}
+
+::: {layout-ncol=2}
+![](figs/Newbold.jpg)
+
+![](figs/Granger.jpg)
+:::
+
+::: {.callout}
+“The combined forecasting methods seem to me to be non-starters . . . Is a combined
+method not in danger of falling between two stools?” [*Maurice Priestley*]{.right}
+:::
+:::
+::::
+
+## Makridakis and Hibon (1982) {.smaller}
+
+::: columns
+::: {.column width="45%"}
+![](figs/M1.png)
+:::
+
+::: {.column width="50%"}
+
+::: {layout-ncol=2}
+![](figs/SMakridakis.jpg)
+
+![](figs/MHibon.jpg)
+:::
+
+::: {.callout}
+This was the first genuine forecasting competition
+
+- 1001 series from demography, industry, economics.
+- Annual, quarterly, monthly data
+- Anyone could submit forecasts
+- Highly controversial at the time.
+- Showed combinations out-performed individual methods
+:::
+:::
+
+::::
+
+## Makridakis and Hibon (1982) {.smaller}
+
+::: columns
+::: {.column width="45%"}
+![](figs/M1.png)
+:::
+
+::: {.column width="50%"}
+
+::: {layout-ncol=2}
+![](figs/SMakridakis.jpg)
+
+![](figs/MHibon.jpg)
+:::
+
+::: {.callout}
+# Conclusions
+1.  Sophisticated methods do not necessarily provide more accurate forecasts than simpler ones.
+2.  The relative ranking of the various methods varies according to the accuracy measure being used.
+3.  The accuracy of combinations is usually better than individual methods.
+4.  The accuracy of methods depends on the length of the forecasting horizon involved.
+:::
+:::
+::::
+
+
+## Makridakis and Hibon (1982) {.smaller}
+
+::: columns
+::: {.column width="45%"}
+![](figs/M1.png)
+:::
+
+::: {.column width="50%"}
+
+::: {layout-ncol=2}
+![](figs/SMakridakis.jpg)
+
+![](figs/MHibon.jpg)
+:::
+
+::: {.callout}
+# Consequences
+
+Researchers started to:
+
+ * take combination method seriously;
+ * consider how to automate forecasting methods;
+ * study what methods give the best forecasts;
+ * be aware of the dangers of over-fitting;
+ * treat forecasting as a different problem from time series analysis.
+:::
+:::
+::::
+
+
+## M4 competition
+
+-   January -- May 2018
+-   100,000 time series: yearly, quarterly, monthly, weekly, daily, hourly.
+-   Point forecast and prediction intervals assessed.
+-   Code must be public
+-   248 registrations, 50 submissions.
+
+
+### Winning methods
+
+1.  Hybrid of Recurrent Neural Network and Exponential Smoothing models
+2.  **Forecast combination** using xgboost to find weights
+
+# The theory of combination forecasts
+
+
+
+
+# Evaluating quantile forecasts
+
+## Evaluating quantile forecasts
+
+\begin{align*}
+f_{p,t} &= \text{quantile forecast with prob. $p$ at time $t$.}\\
+y_{t} &= \text{observation at time $t$}
+\end{align*}
+
+## Quantile score
+
+$$
+  Q_{p,t} = \begin{cases}
+  2(1 - p) \big|y_t - f_{p,t}\big|, & \text{if $y_{t} < f_{p,t}$}\\
+  2p \big|y_{t} - f_{p,t}\big|, & \text{if $y_{t} \ge f_{p,t}$} \end{cases}
+$$
+
+-   Low $Q_{p,t}$ is good
+-   Multiplier of 2 often omitted, but useful for interpretation
+-   $Q_{p,t}$ like absolute error (weighted to account for likely exceedance)
+-   Average $Q_{p,t}$ over $p$ = CRPS (Continuous Rank Probability Score)
+
+```{r pinball, eval=FALSE, echo=FALSE, fig.show='animate', interval=1/10, message=FALSE, fig.height=3, fig.width=5, cache=FALSE}
+# Turn eval=TRUE to recompute these graphs. They are loaded in the above animategraphics call.
+prob <- seq(0.05, 0.95, by = 0.05)
+df <- expand.grid(
+  error = c(-10, 0, 10),
+  p = c(prob, rev(head(prob, -1)[-1]))
+) %>%
+  mutate(
+    state = rep(seq(length(p) / 3), rep(3, length(p) / 3)),
+    qpt = 2 * p * error * (error > 0) - 2 * (1 - p) * error * (error < 0)
+  )
+labels <- df %>%
+  select(p, state) %>%
+  distinct() %>%
+  mutate(label = paste0("p = ", sprintf("%.2f", p)))
+df %>% ggplot(aes(x = error, y = qpt)) +
+  geom_line(aes(group = state), colour = "red") +
+  labs(
+    x = latex2exp::TeX("Error: $y_t - f_{p,t}$"),
+    y = latex2exp::TeX("Q_{p,t}")
+  ) +
+  geom_label(data = labels, aes(x = 0, y = 17, label = label)) +
+  transition_states(state)
+```
+
+```{r crps0, echo=TRUE}
+auscafe
+```
+
+## Evaluating quantile forecasts {auto-animate="true"}
+
+```{r crps1, echo=TRUE}
+auscafe %>%
+  filter(year(date) <= 2018)
+```
+
+## Evaluating quantile forecasts {auto-animate="true"}
+
+```{r crps2, echo=TRUE}
+auscafe %>%
+  filter(year(date) <= 2018) %>%
+  model(
+    ETS = ETS(turnover),
+    ARIMA = ARIMA(turnover ~
+                  pdq(d=1) + PDQ(D=1))
+  )
+```
+
+## Evaluating quantile forecasts
+
+```{r crps3, echo=TRUE}
+auscafe %>%
+  filter(year(date) <= 2018) %>%
+  model(
+    ETS = ETS(turnover),
+    ARIMA = ARIMA(turnover ~
+                  pdq(d=1) + PDQ(D=1))
+  ) %>%
+  forecast(h = "1 year")
+```
+
+## Evaluating quantile forecasts
+
+```{r crps4, echo=TRUE}
+auscafe %>%
+  filter(year(date) <= 2018) %>%
+  model(
+    ETS = ETS(turnover),
+    ARIMA = ARIMA(turnover ~
+                  pdq(d=1) + PDQ(D=1))
+  ) %>%
+  forecast(h = "1 year") %>%
+  accuracy(data = auscafe,
+    measures = list(crps=CRPS, rmse=RMSE)
+  ) %>%
+  arrange(crps)
+```
+
+# Ensemble forecasting
+
+## Ensemble forecasting
+
+**Ensemble forecasting**: **mix the forecast distributions from multiple models.**
+
+-   "All models are wrong, but some are useful" (George Box, 1976)
+-   Allows diverse models to be included, while reducing impact of any specific model.
+-   Allows uncertainty of model selection to be incorporated.
+
+```{r ensemble_samples, echo=FALSE, fig.height=2.6}
+fit <- auscafe %>%
+  filter(year(date) <= 2018) %>%
+  model(
+    ETS = ETS(turnover),
+    ARIMA = ARIMA(turnover ~
+                  pdq(d=1) + PDQ(D=1))
+  )
+future <- fit %>%
+  generate(times = 10, h = "1 year")
+auscafe %>%
+  filter(year(date) >= 2014, year(date) <= 2018) %>%
+  autoplot(turnover) +
+  geom_line(data = future %>% mutate(modrep = paste0(.model, .rep)), aes(y = .sim, col = .model, group = c(modrep))) +
+  labs(x = "Month", y = "Turnover (A$million)") +
+  guides(colour = guide_legend("Model"))
+```
+
+## Ensemble forecasting
+
+```{r ensemble1, echo=TRUE}
+auscafe %>%
+  filter(year(date) <= 2018) %>%
+  model(ETS = ETS(turnover),
+        ARIMA = ARIMA(turnover ~
+                    pdq(d=1) + PDQ(D=1))
+  ) %>%
+  forecast(h = "1 year")
+```
+
+## Ensemble forecasting
+
+```{r ensemble2, echo=TRUE, dependson='ensemble1a'}
+auscafe %>%
+  filter(year(date) <= 2018) %>%
+  model(ETS = ETS(turnover),
+        ARIMA = ARIMA(turnover ~
+                    pdq(d=1) + PDQ(D=1))
+  ) %>%
+  forecast(h = "1 year") %>%
+  summarise(
+    turnover = dist_mixture(
+                turnover[1], turnover[2],
+                weights=c(0.5,0.5))
+  ) %>%
+  mutate(.model = "ENSEMBLE")
+```
+
+## Ensemble forecasting
+
+```{r ensemble4, echo=TRUE, dependson='ensemble2a'}
+auscafe %>%
+  filter(year(date) <= 2018) %>%
+  model(ETS = ETS(turnover),
+        ARIMA = ARIMA(turnover ~
+                    pdq(d=1) + PDQ(D=1))
+  ) %>%
+  forecast(h = "1 year") %>%
+  summarise(
+    turnover = dist_mixture(
+                turnover[1], turnover[2],
+                weights=c(0.5,0.5))
+  ) %>%
+  mutate(.model = "ENSEMBLE") %>%
+  accuracy(
+    data = auscafe,
+    measures = list(crps=CRPS, rmse=RMSE)
+  )
+```
+
+# Combination forecasting
+
+## Combination forecasting
+
+**Combination forecasting: take weighted average of forecasts from multiple models.**
+
+-   Often a simple average is used.
+-   Reduces uncertainty associated with selecting a particular model.
+-   Combination forecasting usually improves point forecast accuracy.
+-   Mean forecast identical to that from corresponding weighted ensemble.
+-   Quantile forecasts need to account for correlations between forecast errors from component models.
+
+## Combination forecasting
+
+```{r combinations1, echo=TRUE}
+auscafe %>%
+  filter(year(date) <= 2018) %>%
+  model(
+    ETS = ETS(turnover),
+    ARIMA = ARIMA(turnover ~
+                  pdq(d=1) + PDQ(D=1))
+  )
+```
+
+## Combination forecasting
+
+```{r combinations2, echo=TRUE}
+auscafe %>%
+  filter(year(date) <= 2018) %>%
+  model(
+    ETS = ETS(turnover),
+    ARIMA = ARIMA(turnover ~
+                  pdq(d=1) + PDQ(D=1))
+  ) %>%
+  mutate(COMB = (ETS + ARIMA)/2)
+```
+
+## Combination forecasting
+
+```{r combinations3, echo=TRUE}
+auscafe %>%
+  filter(year(date) <= 2018) %>%
+  model(
+    ETS = ETS(turnover),
+    ARIMA = ARIMA(turnover ~
+                  pdq(d=1) + PDQ(D=1))
+  ) %>%
+  mutate(COMB = (ETS + ARIMA)/2) %>%
+  forecast(h = "1 year")
+```
+
+## Combination forecasting
+
+```{r combinations4, echo=TRUE}
+auscafe %>%
+  filter(year(date) <= 2018) %>%
+  model(
+    ETS = ETS(turnover),
+    ARIMA = ARIMA(turnover ~
+                  pdq(d=1) + PDQ(D=1))
+  ) %>%
+  mutate(COMB = (ETS + ARIMA)/2) %>%
+  forecast(h = "1 year") %>%
+  accuracy(
+    data = auscafe,
+    measures = list(crps=CRPS, rmse=RMSE)
+  ) %>%
+  arrange(crps)
+```
+
+## Combination vs ensemble forecasting
+
+\fontsize{9}{10}\sf
+
+```{r comparison1, eval=TRUE}
+train <- auscafe %>%
+  filter(year(date) <= 2018)
+fc <- train %>%
+  model(
+    ETS = ETS(turnover),
+    ARIMA = ARIMA(turnover ~
+                  pdq(d=1) + PDQ(D=1))
+  ) %>%
+  mutate(Combination = (ETS + ARIMA)/2) %>%
+  forecast(h = "1 year")
+ensemble <- fc %>%
+  filter(.model %in% c("ETS", "ARIMA")) %>%
+  summarise(
+    turnover = dist_mixture(
+                turnover[1], turnover[2],
+                weights = c(0.5, 0.5))
+  ) %>%
+  mutate(.model = "Ensemble") %>%
+  as_tibble() %>%
+  select(date,.model,turnover)
+combination  <- fc %>%
+  filter(.model=="Combination") %>%
+  as_tibble() %>%
+  select(date,.model,turnover)
+fc2 <- bind_rows(ensemble, combination) %>%
+  mutate(.model = factor(.model, levels=c("Combination","Ensemble"))) %>%
+  as_fable(index=date, key=.model, distribution=turnover, response="turnover")
+fc2 %>% autoplot(train %>% filter(year(date) >= 2017))
+```
+
+## Combination vs ensemble forecasting
+
+```{r comparison2, eval=TRUE, dependson='samples'}
+fc2 %>% autoplot(train %>% filter(year(date) >= 2017)) +
+  autolayer(filter(fc2, .model=="Combination"), color='red')
+```
+
+## Combination vs ensemble forecasting
+
+```{r comparison3}
+fc_combined <- tibble(
+  .model = c("Combination", "Mixture"),
+  dist = c((dist_normal(3700, 80) + dist_normal(3900, 120))/2,
+           dist_mixture(dist_normal(3700, 80), dist_normal(3900, 120), weights = c(0.5, 0.5)))
+)
+fc_base <- tidyr::expand_grid(
+    .model = c("Combination", "Mixture"),
+    dist = c(dist_normal(3700, 80), dist_normal(3900, 120)),
+  ) %>%
+  mutate(.base = rep(c("ETS", "ARIMA"), 2))
+
+ggplot() +
+  stat_dist_slab(aes(dist = dist, y = ""), data = fc_combined) +
+  stat_dist_slab(aes(dist = dist, y = "", colour = .base), size = 0.3, fill = NA, data = fc_base) +
+  geom_vline(aes(xintercept = mu, linetype = "Mean"), mutate(fc_combined, mu = mean(dist))) +
+  geom_vline(aes(xintercept = median, linetype = "Median"), mutate(fc_combined, median = median(dist))) +
+  coord_cartesian(expand = FALSE) +
+  facet_grid(vars(.model), switch = "y") +
+  theme(legend.position = "bottom") +
+  labs(y = NULL, x = NULL, colour = "Model", linetype = "Forecast") +
+  scale_colour_brewer(palette = "Dark2")
+```
+
+```{=tex}
+\only<2->{\begin{textblock}{4.3}(11.4,2)
+\begin{block}{}
+\begin{itemize}
+\item Combinations involve averaging the distributions, taking account of correlations between distributions.
+\item Ensembles involve mixing the distributions, ignoring correlations between distributions.
+\item The means are the same, but other characteristics are different.
+\end{itemize}
+\end{block}
+\end{textblock}}
+```
+
+
+# Forecasting COVID-19 cases
+
+## Forecasting COVID-19 cases
+
+\placefig{0}{1.35}{height=9.2cm, width=20cm}{covid}
+
+## Australian Health Protection Principal Committee
+
+\begin{block}{}The \textbf{Australian Health Protection Principal Committee} is the key decision-making committee for national health emergencies. It comprises all state and territory Chief Health Officers and is chaired by the Australian Chief Medical Officer.
+\end{block}
+
+\begin{alertblock}{COVID-19 forecasting group}
+\begin{multicols}{3}\small
+\begin{itemize}\tightlist
+\item Adeshina Adekunle
+\item August Hao
+\item David J Price
+\item Dennis Liu
+\item Freya M Shearer
+\item Gerry Ryan
+\item James M McCaw
+\item Joshua V Ross
+\item Michael Lydeamore
+\item Mitchell \rlap{O'Hara-Wild}
+\item Nicholas Tierney
+\item Pablo \rlap{Montero-Manso}
+\item Nick Golding
+\item Peter Dawson
+\item Rob J Hyndman
+\item Robert Moss
+\item Ruarai Tobin
+\item Tobin South
+\end{itemize}
+\end{multicols}\vspace*{-0.2cm}
+\end{alertblock}
+
+## Data sources
+
+* Case-level data of all positive COVID-19 tests: onset and detection times.
+* Daily population mobility data from Google, Apple & Facebook
+* Weekly non-household contact surveys
+* Weekly behavioural surveys
+* Daily case numbers from many countries and regions via the Johns Hopkins COVID-19 repository
+
+## Case numbers
+
+```{r localcases, echo=FALSE, fig.height=2.9}
+state_colours <- c(
+  NSW = "#56b4e9",
+  VIC = "#0072b2",
+  QLD = "#009e73",
+  SA = "#f0e442",
+  NT = "#d55e00",
+  WA = "#e69f00",
+  TAS = "#cc79a7",
+  ACT = "#cccccc"
+)
+localcases %>%
+  filter(date <= max(date)-3) |>
+  autoplot(n+1) +
+  labs(x = "Date of symptom onset", y = "Number of daily cases") +
+  scale_x_date(
+    breaks = seq(as.Date("2020-01-01"), by="1 month", length=35),
+    minor_breaks = NULL,
+    labels = c(
+      "J\n 2020","F","M","A","M","J","J","A","S","O","N","D",
+      "J\n 2021","F","M","A","M","J","J","A","S","O","N","D",
+      "J\n 2022","F","M","A","M","J","J","A","S","O","N")
+  ) +
+  scale_color_manual(values = state_colours) +
+  scale_y_log10(breaks = 10^(1:5),
+  labels = c("10","100","1000","10000","100000"))
+```
+
+* Recent case numbers are uncertain and incomplete as date of onset is not known until symptoms show and a test is obtained.
+
+## A model ensemble
+\fontsize{14}{16}\sf
+
+### Model 1: SEEIIR (Uni Melbourne/Doherty Institute)
+
+* Stochastic compartmental model with time-varying effective reproduction number.
+
+### Model 2: Generative model (Uni Adelaide)
+
+* Simulation with three types of infectious individuals: imported, asymptomatic, symptomatic
+
+### Model 3: Global AR model (Monash)
+
+* Single model fitted to all Johns Hopkins data from countries and regions with sufficient data.
+* Series with obvious anomalies removed.
+
+## Forecasting ensemble
+
+* Forecasts obtained from a equally-weighted mixture distribution of the component forecasts.
+* Also known as "linear pooling"
+* Works best when individual models are over-confident and use different data sources.
+
+## Ensemble forecasts: Victoria
+
+```{r combined_forecasts, eval=FALSE}
+# Read weekly samples files from outputs folder and save as rds file
+fs::dir_ls("../uncertain_futures/outputs", glob = "*.csv") %>%
+  purrr::map_dfr(read_csv) %>%
+  nest(sample = sim1:sim2000) %>%
+  group_by(date, state, .model, forecast_origin) %>%
+  mutate(sample = list(unname(unlist(sample)))) %>%
+  ungroup() %>%
+  saveRDS(file = "samples.rds")
+```
+
+```{r read_samples}
+samples <- readRDS("samples.rds")
+ensemble <- make_ensemble(samples)
+```
+
+```{r some_plots, include=FALSE, eval=FALSE}
+vic_ensemble <- ensemble %>% filter(state == "VIC")
+origins <- sort(unique(vic_ensemble$forecast_origin))
+origins <- origins[c(2, 8, 11, 33, 48, 88, 106)]
+for (i in seq_along(origins)) {
+  p <- vic_ensemble %>%
+    filter(forecast_origin == origins[i], date <= origins[i] + 7 * 4) %>%
+    mutate(dist = dist_sample(sample)) %>%
+    select(-sample) %>%
+    as_fable(
+      index = date, key = forecast_origin,
+      response = "n", distribution = dist
+    ) %>%
+    autoplot(level = c(50, 60, 70, 80, 90), point_forecast = lst(median)) +
+    autolayer(
+      filter(
+        localcases, state == "VIC",
+        date >= origins[i] - 7 * 12, date <= origins[i] + 7 * 4
+      ),
+      n
+    ) +
+    scale_x_date(
+      breaks = seq(as.Date("2020-01-01"), by = "1 month", l = 24),
+      minor_breaks = NULL,
+      labels = paste(
+        rep(c("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"), 2),
+        rep(2020:2021, c(12, 12))
+      )
+    ) +
+    theme(legend.position = "none") +
+    xlab("Date of symptom onset") + ylab("Number of daily cases")
+  pdf(paste0(here::here("figure"), "/ensemble", i, ".pdf"),
+    width = 20 / 2.54, height = 10 / 2.54
+  )
+  print(p)
+  crop::dev.off.crop()
+}
+```
+
+
+## Forecastability factors
+
+ 1. we have a good understanding of the factors that contribute to it, and can measure them.
+ 2. there is lots of data available;
+ 3. the future is somewhat similar to the past
+ 4. the forecasts cannot affect the thing we are trying to forecast.
+
+
+# Assessing forecast uncertainty
+
+## Evaluating probabilistic forecasts
+
+```{r qs, include=FALSE}
+# Run to generate the graphs
+qp <- function(p, y) {
+  if (length(p) > 1 & length(y) > 1) {
+    stop("Either p or y should be a scalar")
+  }
+  fp <- qgamma(p, 2)
+  2 * (1 - p) * abs(y - fp) * (y < fp) + 2 * p * abs(y - fp) * (y >= fp)
+}
+gamma <- tibble(
+  y = seq(0, 10, l = 101),
+  f = dgamma(y, 2)
+)
+actual <- 3
+```
+
+```{r pdf00, dependson='qs'}
+# Single pdf graph for median
+prob <- 0.5
+qactual <- qgamma(prob, 2)
+gamma %>%
+  ggplot(aes(x = y, y = f)) +
+  geom_line() +
+  labs(y = "Forecast probability density", x = latex2exp::TeX("Quantile $q_{p}$")) +
+  coord_cartesian(ylim = c(-0, 0.375), xlim = c(0, 10), expand = FALSE, clip = "off")
+```
+
+
+## Evaluating probabilistic forecasts
+
+```{r pdf0, dependson='qs'}
+# Single pdf graph for median
+prob <- 0.5
+qactual <- qgamma(prob, 2)
+gamma %>%
+  ggplot(aes(x = y, y = f)) +
+  geom_line() +
+  geom_point(aes(x = actual, y = y), data = tibble(actual = actual, y = 0)) +
+  geom_label(aes(x = actual, y = 0.02, label = "Actual")) +
+  labs(y = "Forecast probability density", x = latex2exp::TeX("Quantile $q_{p}$")) +
+  coord_cartesian(ylim = c(-0, 0.375), xlim = c(0, 10), expand = FALSE, clip = "off")
+```
+
+
+## Evaluating probabilistic forecasts
+
+```{r pdf1, dependson='qs'}
+# Single pdf graph for median
+prob <- 0.5
+qactual <- qgamma(prob, 2)
+gamma %>%
+  ggplot(aes(x = y, y = f)) +
+  geom_line() +
+  geom_point(aes(x = actual, y = y), data = tibble(actual = actual, y = 0)) +
+  geom_label(aes(x = actual, y = 0.02, label = "Actual")) +
+  labs(y = "Forecast probability density", x = latex2exp::TeX("Quantile $q_{p}$")) +
+  geom_line(aes(x = y, y = f),
+    col = "blue", linetype = 2,
+    data = tibble(y = rep(qactual, 2), f = c(dgamma(qactual, 2), 0))
+  ) +
+  geom_label(aes(x = qactual, y = 0.02, label = "Median"), col = "blue") +
+  geom_label(aes(x = qactual, y = -0.01, label = "0.5 quantile"), col = "blue") +
+  coord_cartesian(ylim = c(-0, 0.375), xlim = c(0, 10), expand = FALSE, clip = "off")
+```
+
+## Evaluating probabilistic forecasts
+
+```{r pdf2, dependson='qs'}
+# Single pdf graph for 0.8 quantile
+prob <- 0.9
+qactual <- qgamma(prob, 2)
+gamma %>%
+  ggplot(aes(x = y, y = f)) +
+  geom_line() +
+  geom_point(aes(x = actual, y = y), data = tibble(actual = actual, y = 0)) +
+  geom_label(aes(x = actual, y = 0.02, label = "Actual")) +
+  labs(y = "Forecast probability density", x = latex2exp::TeX("Quantile $q_{p}$")) +
+  geom_line(aes(x = y, y = f),
+    col = "blue", linetype = 2,
+    data = tibble(y = rep(qactual, 2), f = c(dgamma(qactual, 2), 0))
+  ) +
+  geom_label(aes(x = qactual, y = -0.01, label = paste(sprintf("%.2f", prob), "quantile")), col = "blue") +
+  coord_cartesian(ylim = c(-0, 0.375), xlim = c(0, 10), expand = FALSE, clip = "off")
+```
+
+## Evaluating probabilistic forecasts
+
+```{r pdfqs, dependson='qs', eval=FALSE}
+# pdf plus quantile score graph for several quantiles
+prob <- c(0.1, 0.3, 0.5, 0.7, 0.9)
+qactual <- qgamma(prob, 2)
+qpactual <- qp(prob, actual)
+for (i in seq_along(prob)) {
+  p1 <- gamma %>%
+    ggplot(aes(x = y, y = f)) +
+    geom_line() +
+    geom_point(aes(x = actual, y = y), data = tibble(actual = actual, y = 0)) +
+    labs(y = "Forecast probability density", x = latex2exp::TeX("Quantile $q_{p}$")) +
+    geom_line(aes(x = y, y = f),
+      col = "blue", linetype = 2,
+      data = tibble(y = rep(qactual[i], 2), f = c(dgamma(qactual[i], 2), 0))
+    ) +
+    geom_label(aes(x = actual, y = 0.03, label = "Actual")) +
+    geom_label(aes(x = qactual[i], y = -0.02, label = paste(sprintf("%.2f", prob[i]), "quantile")), col = "blue") +
+    coord_cartesian(ylim = c(-0, 0.375), xlim = c(0, 10), expand = FALSE, clip = "off")
+  p2 <- tibble(
+    y = seq(0, 10, l = 101),
+    Q = qp(prob[i], y)
+  ) %>%
+    ggplot(aes(x = y, y = Q)) +
+    geom_line() +
+    labs(
+      x = latex2exp::TeX("Quantile $q_{p}$"),
+      y = latex2exp::TeX("Quantile score $S_{p}$")
+    ) +
+    geom_line(aes(x = y, y = Q),
+      col = "red", linetype = 2,
+      data = tibble(y = c(actual, actual), Q = c(14.5, qpactual[i]))
+    ) +
+    geom_line(aes(x = y, y = Q),
+      col = "red", linetype = 2,
+      data = tibble(y = c(actual, 0), Q = rep(qpactual[i], 2))
+    ) +
+    geom_line(aes(x = y, y = f),
+      col = "blue", linetype = 2,
+      data = tibble(y = rep(qactual[i], 2), f = c(0, 13.5))
+    ) +
+    coord_cartesian(ylim = c(0, 11.6), xlim = c(0, 10), expand = FALSE, clip = "off")
+  pdf(paste0("figure/pdfqs", i, ".pdf"), width = 15 / 1.5, height = 8 / 1.5)
+  print(p1 / p2)
+  crop::dev.off.crop()
+}
+```
+
+## Evaluating probabilistic forecasts
+
+```{r pdfqs2, include=FALSE, dependson='qs', eval=FALSE}
+qs <- seq(0, 10, l = 200)
+prob <- pgamma(qs, 2)
+prob <- c(prob[prob <= 0.999], 0.9999)
+for (i in seq_along(prob)) {
+  qactual <- qgamma(prob[i], 2)
+  qpactual <- qp(prob[i], actual)
+  p1 <- gamma %>%
+    ggplot(aes(x = y, y = f)) +
+    geom_line() +
+    geom_point(aes(x = actual, y = y), data = tibble(actual = actual, y = 0)) +
+    geom_label(aes(x = actual, y = 0.02, label = "Actual")) +
+    labs(y = "Forecasting probability density", x = latex2exp::TeX("Quantile $q_{p}$")) +
+    geom_line(aes(x = y, y = f),
+      col = "blue", linetype = 2,
+      data = tibble(y = rep(qactual, 2), f = c(dgamma(qactual, 2), -0.1))
+    ) +
+    coord_cartesian(ylim = c(-0, 0.375), xlim = c(0, 10), expand = FALSE, clip = "off")
+  p2 <- tibble(
+    y = seq(0, 10, l = 101),
+    Q = qp(prob[i], y)
+  ) %>%
+    ggplot(aes(x = y, y = Q)) +
+    geom_line() +
+    labs(
+      x = latex2exp::TeX("Quantile $q_{p}$"),
+      y = latex2exp::TeX("Quantile score $S_{p}$")
+    ) +
+    geom_line(aes(x = y, y = Q),
+      col = "red", linetype = 2,
+      data = tibble(y = rep(actual, 2), Q = c(14.5, qpactual))
+    ) +
+    geom_line(aes(x = y, y = Q),
+      col = "red", linetype = 2,
+      data = tibble(y = c(actual, -1), Q = rep(qpactual, 2))
+    ) +
+    geom_line(aes(x = y, y = f),
+      col = "blue", linetype = 2,
+      data = tibble(y = rep(qactual, 2), f = c(0, 12))
+    ) +
+    geom_label(aes(x = qactual, y = 11.6, label = paste(sprintf("%.3f", prob[i]), "quantile")), col = "blue") +
+    coord_cartesian(ylim = c(0, 11.6), xlim = c(0, 10), expand = FALSE, clip = "off")
+
+  p3data <- tibble(
+    p = prob,
+    Q = qp(prob, actual)
+  ) %>%
+    filter(p <= prob[i])
+  p3 <- p3data %>%
+    ggplot(aes(x = p, y = Q)) +
+    geom_line(col = "red") +
+    geom_polygon(
+      fill = "#ffbbbb",
+      data = bind_rows(p3data, tibble(p = prob[i], Q = 0))
+    ) +
+    geom_line(data = tibble(p = c(prob[i], 1), Q = rep(qpactual, 2)), col = "red", linetype = 2) +
+    # geom_point(data=tibble(p=prob[i],Q=qpactual), col='red') +
+    labs(
+      x = latex2exp::TeX("Probability p"),
+      y = latex2exp::TeX("Quantile score $S_{p}$")
+    ) +
+    coord_cartesian(ylim = c(0, 11.6), xlim = c(0, 1), expand = FALSE, clip = "off")
+
+  pdf(file = paste0("figure/qs", i, ".pdf"), width = 15 / 1.5, height = 8 / 1.5)
+  print((plot_spacer() | p1) / (p3 | p2))
+  crop::dev.off.crop()
+}
+```
+
+\begin{textblock}{18}(0.3,1.4)
+\animategraphics[width=14cm,height=20cm,keepaspectratio]{185}{figure/qs}{1}{185}
+\end{textblock}
+
+## Evaluating probabilistic forecasts
+
+\begin{textblock}{18}(0.3,1.4)
+\includegraphics[width=14cm,height=20cm,keepaspectratio]{figure/qs185}
+\end{textblock}
+
+\only<2>{\begin{textblock}{4}(2,7)\fontsize{11}{11}\sf
+\textcolor{red}{Area = CRPS}
+\end{textblock}}
+
+## CRPS: Continuous Ranked Probability Score
+
+```{r crps}
+crps <- bind_rows(
+  ensemble %>% sample_crps(localcases) %>% mutate(Model = "Ensemble"),
+  samples %>% filter(.model == "gar") %>% sample_crps(localcases) %>% mutate(Model = "Global AR"),
+  samples %>% filter(.model == "moss") %>% sample_crps(localcases) %>% mutate(Model = "SEEIIR"),
+  samples %>% filter(.model == "uoa") %>% sample_crps(localcases) %>% mutate(Model = "Generative")
+)
+```
+
+```{r crps_plot, fig.height=4.6, fig.width=10}
+crps %>%
+  filter(
+    h >= 1, h <= 20,
+    state %in% c("NSW", "QLD", "SA", "VIC")
+  ) %>%
+  ggplot(aes(x = h, y = crps, group = Model, col = Model)) +
+  geom_line() +
+  facet_wrap(. ~ state, scales = "free_y") +
+  labs(x = "Forecast horizon (days)", y = "Average CRPS") +
+  scale_color_manual(values = c("#D55E00", "#0072B2", "#009E73", "#CC79A7"))
+```
+
+\begin{textblock}{14.5}(0.5,8)
+\begin{block}{}
+For weekly forecasts created from 17 September 2020 to 15 June 2021
+\end{block}
+\end{textblock}
+
+# Forecasting many series
+
+## Forecasting many series
+
+```{r states1, echo=TRUE}
+cafe
+```
+
+## Forecasting many series
+
+```{r states_plot2, include=FALSE}
+cafe %>%
+  autoplot(turnover) +
+  labs(
+    x = "Month",
+    y = "Turnover (A$million)",
+    title = "Australian monthly café turnover"
+  )
+```
+
+## Forecasting many series
+
+```{r states2, echo=TRUE}
+cafe %>%
+  filter(year(date) <= 2018)
+```
+
+## Forecasting many series
+
+```{r states3, echo=TRUE}
+cafe %>%
+  filter(year(date) <= 2018) %>%
+  model(
+    ETS = ETS(turnover),
+    ARIMA = ARIMA(turnover ~
+                  pdq(d=1) + PDQ(D=1)),
+    SNAIVE = SNAIVE(turnover)
+  ) %>%
+  mutate(
+    COMB = (ETS+ARIMA)/2
+  )
+```
+
+## Forecasting many series
+
+```{r states4, echo=TRUE}
+cafe %>%
+  filter(year(date) <= 2018) %>%
+  model(
+    ETS = ETS(turnover),
+    ARIMA = ARIMA(turnover ~
+                  pdq(d=1) + PDQ(D=1)),
+    SNAIVE = SNAIVE(turnover)
+  ) %>%
+  mutate(
+    COMB = (ETS+ARIMA)/2
+  ) %>%
+  forecast(h = "1 year")
+```
+
+## Forecasting many series
+
+```{r states5, echo=TRUE}
+cafe %>%
+  filter(year(date) <= 2018) %>%
+  model(
+    ETS = ETS(turnover),
+    ARIMA = ARIMA(turnover ~
+                  pdq(d=1) + PDQ(D=1)),
+    SNAIVE = SNAIVE(turnover)
+  ) %>%
+  mutate(
+    COMB = (ETS+ARIMA)/2
+  ) %>%
+  forecast(h = "1 year") %>%
+  accuracy(data = cafe,
+    measures = list(crps=CRPS, rmse=RMSE)
+  )
+```
+
+## Forecasting many series
+
+```{r states6, echo=TRUE}
+cafe %>%
+  filter(year(date) <= 2018) %>%
+  model(
+    ETS = ETS(turnover),
+    ARIMA = ARIMA(turnover ~
+                  pdq(d=1) + PDQ(D=1)),
+    SNAIVE = SNAIVE(turnover)
+  ) %>%
+  mutate(
+    COMB = (ETS+ARIMA)/2
+  ) %>%
+  forecast(h = "1 year") %>%
+  accuracy(data = cafe,
+    measures = list(ss=skill_score(CRPS))
+  )
+```
+
+## Forecasting many series
+
+```{r states8, echo=TRUE}
+cafe %>%
+  filter(year(date) <= 2018) %>%
+  model(
+    ETS = ETS(turnover),
+    ARIMA = ARIMA(turnover ~
+                  pdq(d=1) + PDQ(D=1)),
+    SNAIVE = SNAIVE(turnover)
+  ) %>%
+  mutate(
+    COMB = (ETS+ARIMA)/2
+  ) %>%
+  forecast(h = "1 year") %>%
+  accuracy(data = cafe,
+    measures = list(ss=skill_score(CRPS))
+  ) %>%
+  group_by(.model) %>%
+  summarise(sspc = mean(ss) * 100)
+```
+
+Skill score is relative to seasonal naive forecasts
+
+# For more information
+
+**Slides:** [robjhyndman.com/seminars/compstat2022](https://robjhyndman.com/seminars/compstat2022)
+
+::: {.callout-note icon="false"}
+# Find me at:
+
+`r fa("home")` [robjhyndman.com](https://robjhyndman.com)<br> `r fa("twitter")` [\@robjhyndman](https://twitter.com/robjhyndman)<br> `r fa("github")` [\@robjhyndman](https://github.com/robjhyndman)<br> `r fa("envelope")` [rob.hyndman\@monash.edu](mailto:rob.hyndman@monash.edu)
+:::
+
+## Quantile forecasts
+
+```{r quantiles3, dependson='quantiles'}
+p1 +
+  geom_line(aes(y = turnover), data = auscafe %>% filter(year(date) >= 2018))
+```
