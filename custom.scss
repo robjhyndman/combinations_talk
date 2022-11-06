@@ -21,6 +21,15 @@ $presentation-heading-color: #0063a7 !default;
 }
 
 // Callout backgrounds
+
+.callout.callout-style-simple {
+  border-left: solid #c14b14 0.3rem !important;
+}
+
+div.callout-important.callout-style-default .callout-caption {
+  background-color: #a1b8c8 !important;
+}
+
 div.callout-note.callout-style-default .callout-caption {
   background-color: #a1b8c8 !important;
 }
@@ -128,4 +137,8 @@ p.author {
 }
 .right {
     float: right;
+}
+
+figure>figcaption {
+  margin-top: 0em !important;
 }

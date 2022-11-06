@@ -30,6 +30,19 @@ editor_options:
 
 # What is a forecast?
 
+```{css}
+/* Adding here rather than in scss file to override an !important flag */
+div.callout-note {
+  border-left-color: #0063a7 !important;
+}
+div.callout-warning {
+  border-left-color: #c14b14 !important;
+}
+div.callout-important {
+  border-left-color: #0063a7 !important;
+}
+```
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(
   echo = FALSE,
@@ -301,80 +314,103 @@ method not in danger of falling between two stools?” [*Maurice Priestley*]{.ri
 :::
 ::::
 
-## Makridakis and Hibon (1982) {.smaller}
 
-::: columns
+## Makridakis competition (1982) {.smaller}
+
+:::: {.columns}
+
 ::: {.column width="45%"}
 ![](figs/M1.png)
 :::
 
 ::: {.column width="50%"}
 
-::: {layout-ncol=2}
-![](figs/SMakridakis.jpg)
-
-![](figs/MHibon.jpg)
-:::
+::: {layout-ncol=2 style="margin-bottom: 0em;"}
+![*Spyros Makridakis*](figs/SMakridakis.jpg)
 
 ::: {.callout}
-This was the first genuine forecasting competition
+The first genuine forecasting competition
+
+::: {.tightlist}
 
 - 1001 series from demography, industry, economics.
-- Annual, quarterly, monthly data
-- Anyone could submit forecasts
 - Highly controversial at the time.
 - Showed combinations out-performed individual methods
 :::
 :::
+:::
+
+:::
 
 ::::
 
-## Makridakis and Hibon (1982) {.smaller}
+## Makridakis competition (1982) {.smaller}
 
-::: columns
+:::: {.columns}
+
 ::: {.column width="45%"}
 ![](figs/M1.png)
 :::
 
 ::: {.column width="50%"}
 
-::: {layout-ncol=2}
-![](figs/SMakridakis.jpg)
-
-![](figs/MHibon.jpg)
-:::
+::: {layout-ncol=2 style="margin-bottom: 0em;"}
+![*Spyros Makridakis*](figs/SMakridakis.jpg)
 
 ::: {.callout}
+The first genuine forecasting competition
+
+::: {.tightlist}
+
+- 1001 series from demography, industry, economics.
+- Highly controversial at the time.
+- Showed combinations out-performed individual methods
+:::
+:::
+:::
+
+::: {.callout-important}
 # Conclusions
 1.  Sophisticated methods do not necessarily provide more accurate forecasts than simpler ones.
 2.  The relative ranking of the various methods varies according to the accuracy measure being used.
-3.  The accuracy of combinations is usually better than individual methods.
+3.  **The accuracy of combinations is usually better than individual methods.**
 4.  The accuracy of methods depends on the length of the forecasting horizon involved.
 :::
 :::
+
 ::::
 
 
-## Makridakis and Hibon (1982) {.smaller}
+## Makridakis competition (1982) {.smaller}
 
-::: columns
+
+:::: {.columns}
+
 ::: {.column width="45%"}
 ![](figs/M1.png)
 :::
 
 ::: {.column width="50%"}
 
-::: {layout-ncol=2}
-![](figs/SMakridakis.jpg)
-
-![](figs/MHibon.jpg)
-:::
+::: {layout-ncol=2 style="margin-bottom: 0em;"}
+![*Spyros Makridakis*](figs/SMakridakis.jpg)
 
 ::: {.callout}
-# Consequences
+The first genuine forecasting competition
 
+::: {.tightlist}
+
+- 1001 series from demography, industry, economics.
+- Highly controversial at the time.
+- Showed combinations out-performed individual methods
+:::
+:::
+:::
+::: {.callout-important}
+# Consequences
 Researchers started to:
 
+::: {.tightlist}
  * take combination method seriously;
  * consider how to automate forecasting methods;
  * study what methods give the best forecasts;
@@ -382,27 +418,149 @@ Researchers started to:
  * treat forecasting as a different problem from time series analysis.
 :::
 :::
+:::
+
 ::::
 
 
-## M4 competition
 
+## M4 competition (2020) {.smaller}
+
+
+:::: {.columns}
+
+::: {.column width="45%"}
+![](figs/M4paper.png)
+:::
+
+::: {.column width="50%"}
+
+::: {.callout}
 -   January -- May 2018
 -   100,000 time series: yearly, quarterly, monthly, weekly, daily, hourly.
 -   Point forecast and prediction intervals assessed.
 -   Code must be public
 -   248 registrations, 50 submissions.
+:::
 
-
-### Winning methods
+::: {.callout-important}
+# Winning methods
 
 1.  Hybrid of Recurrent Neural Network and Exponential Smoothing models
 2.  **Forecast combination** using xgboost to find weights
+:::
+:::
+::::
 
-# The theory of combination forecasts
+
+# Combining point forecasts
+
+## Weighted averages {.smaller}
+
+Suppose we have $N$ different forecasting methods.
+
+::: {.incremental}
+* $\hat{\bm{y}}_{T+h|T} = N$-vector of $h$-step-ahead forecasts using information up to time $T$.
+* $\bm{\Sigma}_{T+h|T}=$ $N\times N$ covariance matrix of the $h$-step forecast errors.
+* $\bm{1}=$ unit vector.
+
+* Simple combination: $\tilde{y}_{T+h|T} = N^{-1}\bm{1}'\hat{\bm{y}}_{T+h|T}$
+* Linear combination: $\tilde{y}_{T+h|T} = \bm{w}'_{T+h|T}\hat{\bm{y}}_{T+h|T}$
+:::
+
+. . .
+
+::: {.callout-important}
+# Optimal combination (minimizing MSE):
+$$\bm{w}_{T+h|T} = \frac{\bm{\Sigma}_{T+h|T}^{-1}\bm{1}}{\bm{1}'\bm{\Sigma}_{T+h|T}^{-1}\bm{1}'}$$
+(Bates & Granger, 1969; Granger & Newbold, 1974)
+:::
+
+## Bates and Granger (1969)
+
+```{r}
+# WOS search result 2022-2-9
+# topic:
+#      forecast: forecast*
+#      forecast combinations: (forecast* NEAR/5 combin*) OR (forecast* NEAR/5 ensemble*) OR (forecast* NEAR/5 averag*) OR (forecast* NEAR/5 aggregat*) OR (forecast* NEAR/5 pool*) OR (forecast* AND ((model* NEAR/5 combin*) OR (model* NEAR/5 ensemble*) OR (model* NEAR/5 averag*) OR (model* NEAR/5 aggregat*) OR (model* NEAR/5 pool*)))
+# publication date: 1969-01-01 - 2021.12.31
+# tips of search operators: https://images.webofknowledge.com/images/help/WOS/hs_search_operators.html
+
+left_join(
+    readr::read_table(here::here("data/analyze-all.txt")) |> select(-Proportion),
+    readr::read_table(here::here("data/analyze-sel.txt")) |> select(-Proportion),
+    by = "Year"
+  ) |>
+  rename("Forecast" = Count.x, "Forecast combinations" = Count.y) |>
+  mutate(Percentage = `Forecast combinations` / Forecast * 100) |>
+  as_tsibble(index=Year) |>
+  fill_gaps() |>
+  autoplot(Percentage) +
+  labs(x = "Publication year", y = "Percentage",
+       title = "Proportion of forecasting papers about combinations")
+```
+
+## Variations
+
+### Regression weights
+Regress $y_{t+h}$ against $\hat{\bm{y}}_{t+h|t}$ for $t=1,\dots,T$.
+
+::: {.tightlist}
+* Gives identical results to minimum MSE approach if weights constrained to sum to 1 and no intercept.
+* Forecasts are highly correlated, so principal component regression works better.
+:::
+
+. . .
+
+### Inverse variance weights
+
+* More weight on methods with smaller forecast variance
+
+. . .
+
+### AIC weights
+
+* More weight on methods with lower AIC values
+
+## Yet more variations
+
+* Bayesian weights
+* Nonlinear combinations
+* Sparse combinations
+* Meta-learning weights
 
 
+## Forecast combination puzzle
 
+**Simple average combinations almost always give more accurate forecasts than other combination methods.**
+
+. . .
+
+* Due to the error arising from estimation the weights
+* Sample sizes are rarely large enough to do better than simple averaging
+* Optimal weights change over time making estimation even more difficult
+* Successful combination strategies have used huge collections of time series
+
+## FFORMA {.smaller}
+
+::: {.callout-note}
+# Feature-based FORecast Model Averaging
+
+1. Take 100,000 series from M4 competition.
+2. For each series produce forecasts from 8 different models.
+3. For each series compute a large number of features (e.g., length, strength of seasonality, strength of trend, spectral entropy, autocorrelations, Hurst exponent, unit root test statistics, etc.
+4. Train xgboost to learn weights of forecast combination using features as inputs.
+:::
+
+. . .
+
+::: {.tightlist}
+ * The probability of each model being best is used to construct a model weight.
+ * A combination forecast is produced using these weights.
+ * **Came second in the M4 competition**
+:::
+
+# Combining probabilistic forecasts
 
 # Evaluating quantile forecasts
 
