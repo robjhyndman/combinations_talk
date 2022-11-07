@@ -62,6 +62,7 @@ library(distributional)
 library(gganimate)
 library(stringr)
 library(ggdist)
+library(patchwork)
 
 set.seed(2020 - 08 - 10)
 
@@ -264,7 +265,7 @@ p1 +
 
 ```{r quantiles, dependson='samples3'}
 qf <- fit |>
-  generate(times = 1000, h = "1 year") |>
+  generate(times = 1000, h = "2 years") |>
   as_tibble() |>
   group_by(Month) |>
   summarise(
@@ -775,31 +776,6 @@ $$
 -   $Q_{p,t}$ like absolute error (weighted to account for likely exceedance)
 -   Average $Q_{p,t}$ over $p$ = CRPS (Continuous Rank Probability Score)
 
-```{r pinball, echo=FALSE, fig.show='animate', interval=1/10, message=FALSE, fig.height=3, fig.width=5, cache=FALSE}
-# Turn eval=TRUE to recompute these graphs. They are loaded in the above animategraphics call.
-prob <- seq(0.05, 0.95, by = 0.05)
-df <- expand.grid(
-  error = c(-10, 0, 10),
-  p = c(prob, rev(head(prob, -1)[-1]))
-) |>
-  mutate(
-    state = rep(seq(length(p) / 3), rep(3, length(p) / 3)),
-    qpt = 2 * p * error * (error > 0) - 2 * (1 - p) * error * (error < 0)
-  )
-labels <- df |>
-  select(p, state) |>
-  distinct() |>
-  mutate(label = paste0("p = ", sprintf("%.2f", p)))
-df |> ggplot(aes(x = error, y = qpt)) +
-  geom_line(aes(group = state), colour = "red") +
-  labs(
-    x = latex2exp::TeX("Error: $y_t - f_{p,t}$"),
-    y = latex2exp::TeX("Q_{p,t}")
-  ) +
-  geom_label(data = labels, aes(x = 0, y = 17, label = label)) +
-  transition_states(state)
-```
-
 ## Evaluating probabilistic forecasts
 
 ```{r qs, include=FALSE}
@@ -811,155 +787,37 @@ qp <- function(p, y) {
   fp <- qgamma(p, 2)
   2 * (1 - p) * abs(y - fp) * (y < fp) + 2 * p * abs(y - fp) * (y >= fp)
 }
-gamma <- tibble(
-  y = seq(0, 10, l = 101),
-  f = dgamma(y, 2)
-)
-actual <- 3
-```
-
-```{r pdf00, dependson='qs'}
-# Single pdf graph for median
-prob <- 0.5
-qactual <- qgamma(prob, 2)
-gamma |>
-  ggplot(aes(x = y, y = f)) +
-  geom_line() +
-  labs(y = "Forecast probability density", x = latex2exp::TeX("Quantile $q_{p}$")) +
-  coord_cartesian(ylim = c(-0, 0.375), xlim = c(0, 10), expand = FALSE, clip = "off")
-```
-
-
-## Evaluating probabilistic forecasts
-
-```{r pdf0, dependson='qs'}
-# Single pdf graph for median
-prob <- 0.5
-qactual <- qgamma(prob, 2)
-gamma |>
-  ggplot(aes(x = y, y = f)) +
-  geom_line() +
-  geom_point(aes(x = actual, y = y), data = tibble(actual = actual, y = 0)) +
-  geom_label(aes(x = actual, y = 0.02, label = "Actual")) +
-  labs(y = "Forecast probability density", x = latex2exp::TeX("Quantile $q_{p}$")) +
-  coord_cartesian(ylim = c(-0, 0.375), xlim = c(0, 10), expand = FALSE, clip = "off")
-```
-
-
-## Evaluating probabilistic forecasts
-
-```{r pdf1, dependson='qs'}
-# Single pdf graph for median
-prob <- 0.5
-qactual <- qgamma(prob, 2)
-gamma |>
-  ggplot(aes(x = y, y = f)) +
-  geom_line() +
-  geom_point(aes(x = actual, y = y), data = tibble(actual = actual, y = 0)) +
-  geom_label(aes(x = actual, y = 0.02, label = "Actual")) +
-  labs(y = "Forecast probability density", x = latex2exp::TeX("Quantile $q_{p}$")) +
-  geom_line(aes(x = y, y = f),
-    col = "blue", linetype = 2,
-    data = tibble(y = rep(qactual, 2), f = c(dgamma(qactual, 2), 0))
-  ) +
-  geom_label(aes(x = qactual, y = 0.02, label = "Median"), col = "blue") +
-  geom_label(aes(x = qactual, y = -0.01, label = "0.5 quantile"), col = "blue") +
-  coord_cartesian(ylim = c(-0, 0.375), xlim = c(0, 10), expand = FALSE, clip = "off")
-```
-
-## Evaluating probabilistic forecasts
-
-```{r pdf2, dependson='qs'}
-# Single pdf graph for 0.8 quantile
-prob <- 0.9
-qactual <- qgamma(prob, 2)
-gamma |>
-  ggplot(aes(x = y, y = f)) +
-  geom_line() +
-  geom_point(aes(x = actual, y = y), data = tibble(actual = actual, y = 0)) +
-  geom_label(aes(x = actual, y = 0.02, label = "Actual")) +
-  labs(y = "Forecast probability density", x = latex2exp::TeX("Quantile $q_{p}$")) +
-  geom_line(aes(x = y, y = f),
-    col = "blue", linetype = 2,
-    data = tibble(y = rep(qactual, 2), f = c(dgamma(qactual, 2), 0))
-  ) +
-  geom_label(aes(x = qactual, y = -0.01, label = paste(sprintf("%.2f", prob), "quantile")), col = "blue") +
-  coord_cartesian(ylim = c(-0, 0.375), xlim = c(0, 10), expand = FALSE, clip = "off")
-```
-
-## Evaluating probabilistic forecasts
-
-```{r pdfqs, dependson='qs', eval=FALSE}
-# pdf plus quantile score graph for several quantiles
-prob <- c(0.1, 0.3, 0.5, 0.7, 0.9)
-qactual <- qgamma(prob, 2)
-qpactual <- qp(prob, actual)
-for (i in seq_along(prob)) {
-  p1 <- gamma |>
+den_plot <- function(prob, actual=3) {
+  p <- tibble(
+      y = seq(0, 10, l = 101),
+      f = dgamma(y, 2)
+    ) |>
     ggplot(aes(x = y, y = f)) +
     geom_line() +
-    geom_point(aes(x = actual, y = y), data = tibble(actual = actual, y = 0)) +
-    labs(y = "Forecast probability density", x = latex2exp::TeX("Quantile $q_{p}$")) +
-    geom_line(aes(x = y, y = f),
-      col = "blue", linetype = 2,
-      data = tibble(y = rep(qactual[i], 2), f = c(dgamma(qactual[i], 2), 0))
-    ) +
-    geom_label(aes(x = actual, y = 0.03, label = "Actual")) +
-    geom_label(aes(x = qactual[i], y = -0.02, label = paste(sprintf("%.2f", prob[i]), "quantile")), col = "blue") +
-    coord_cartesian(ylim = c(-0, 0.375), xlim = c(0, 10), expand = FALSE, clip = "off")
-  p2 <- tibble(
-    y = seq(0, 10, l = 101),
-    Q = qp(prob[i], y)
-  ) |>
-    ggplot(aes(x = y, y = Q)) +
-    geom_line() +
-    labs(
-      x = latex2exp::TeX("Quantile $q_{p}$"),
-      y = latex2exp::TeX("Quantile score $S_{p}$")
-    ) +
-    geom_line(aes(x = y, y = Q),
-      col = "red", linetype = 2,
-      data = tibble(y = c(actual, actual), Q = c(14.5, qpactual[i]))
-    ) +
-    geom_line(aes(x = y, y = Q),
-      col = "red", linetype = 2,
-      data = tibble(y = c(actual, 0), Q = rep(qpactual[i], 2))
-    ) +
-    geom_line(aes(x = y, y = f),
-      col = "blue", linetype = 2,
-      data = tibble(y = rep(qactual[i], 2), f = c(0, 13.5))
-    ) +
-    coord_cartesian(ylim = c(0, 11.6), xlim = c(0, 10), expand = FALSE, clip = "off")
-  pdf(paste0("figure/pdfqs", i, ".pdf"), width = 15 / 1.5, height = 8 / 1.5)
-  print(p1 / p2)
-  crop::dev.off.crop()
-}
-```
-
-## Evaluating probabilistic forecasts
-
-```{r pdfqs2, include=FALSE, dependson='qs', eval=FALSE}
-qs <- seq(0, 10, l = 200)
-prob <- pgamma(qs, 2)
-prob <- c(prob[prob <= 0.999], 0.9999)
-for (i in seq_along(prob)) {
-  qactual <- qgamma(prob[i], 2)
-  qpactual <- qp(prob[i], actual)
-  p1 <- gamma |>
-    ggplot(aes(x = y, y = f)) +
-    geom_line() +
-    geom_point(aes(x = actual, y = y), data = tibble(actual = actual, y = 0)) +
-    geom_label(aes(x = actual, y = 0.02, label = "Actual")) +
-    labs(y = "Forecasting probability density", x = latex2exp::TeX("Quantile $q_{p}$")) +
-    geom_line(aes(x = y, y = f),
-      col = "blue", linetype = 2,
+    labs(y = "Forecasting probability density", x = latex2exp::TeX("Quantile $q_{p}$"))
+  if(!is.null(actual)) {
+    p <- p + geom_point(aes(x = actual, y = y), data = tibble(actual = actual, y = 0)) +
+      geom_label(aes(x = actual, y = 0.02, label = "Actual"))
+  }
+  if(!is.null(prob)) {
+    qactual <- qgamma(prob, 2)
+    if(!is.null(actual))
+      qpactual <- qp(prob, actual)
+    p <- p + geom_line(aes(x = y, y = f), col = "blue", linetype = 2,
       data = tibble(y = rep(qactual, 2), f = c(dgamma(qactual, 2), -0.1))
-    ) +
+    )  +
+    geom_label(aes(x = qactual, y = -0.01, label = paste(sprintf("%.3f", prob), "quantile")), col = "blue")
+  }
+  p +
     coord_cartesian(ylim = c(-0, 0.375), xlim = c(0, 10), expand = FALSE, clip = "off")
-  p2 <- tibble(
-    y = seq(0, 10, l = 101),
-    Q = qp(prob[i], y)
-  ) |>
+}
+score_plot <- function(prob, actual=3) {
+  qactual <- qgamma(prob, 2)
+  qpactual <- qp(prob, actual)
+  tibble(
+      y = seq(0, 10, l = 101),
+      Q = qp(prob, y)
+    ) |>
     ggplot(aes(x = y, y = Q)) +
     geom_line() +
     labs(
@@ -978,49 +836,73 @@ for (i in seq_along(prob)) {
       col = "blue", linetype = 2,
       data = tibble(y = rep(qactual, 2), f = c(0, 12))
     ) +
-    geom_label(aes(x = qactual, y = 11.6, label = paste(sprintf("%.3f", prob[i]), "quantile")), col = "blue") +
+    #geom_label(aes(x = qactual, y = 11.6, label = paste(sprintf("%.3f", prob), "quantile")), col = "blue") +
     coord_cartesian(ylim = c(0, 11.6), xlim = c(0, 10), expand = FALSE, clip = "off")
-
+}
+crps_plot <- function(thisprob, actual=3) {
+  qpactual <- qp(thisprob, actual)
+  qs <- seq(0, 10, l = 200)
+  prob <- pgamma(qs, 2)
+  prob <- c(prob[prob <= 0.999], 0.9999)
   p3data <- tibble(
-    p = prob,
-    Q = qp(prob, actual)
-  ) |>
-    filter(p <= prob[i])
-  p3 <- p3data |>
+      p = prob,
+      Q = qp(prob, actual)
+    ) |>
+    filter(p <= thisprob)
+  p <- p3data |>
     ggplot(aes(x = p, y = Q)) +
     geom_line(col = "red") +
     geom_polygon(
       fill = "#ffbbbb",
-      data = bind_rows(p3data, tibble(p = prob[i], Q = 0))
+      data = bind_rows(p3data, tibble(p = thisprob, Q = 0))
     ) +
-    geom_line(data = tibble(p = c(prob[i], 1), Q = rep(qpactual, 2)), col = "red", linetype = 2) +
-    # geom_point(data=tibble(p=prob[i],Q=qpactual), col='red') +
+    geom_line(data = tibble(p = c(thisprob, 1), Q = rep(qpactual, 2)), col = "red", linetype = 2) +
     labs(
       x = latex2exp::TeX("Probability p"),
       y = latex2exp::TeX("Quantile score $S_{p}$")
     ) +
     coord_cartesian(ylim = c(0, 11.6), xlim = c(0, 1), expand = FALSE, clip = "off")
-
-  pdf(file = paste0("figure/qs", i, ".pdf"), width = 15 / 1.5, height = 8 / 1.5)
-  print((plot_spacer() | p1) / (p3 | p2))
-  crop::dev.off.crop()
+  if(thisprob > 0.995)
+    p <- p + geom_text(aes(x=0.35,y=5,label="Area = CRPS"), color="red", size=10)
+  p
 }
 ```
 
-\begin{textblock}{18}(0.3,1.4)
-\animategraphics[width=14cm,height=20cm,keepaspectratio]{185}{figure/qs}{1}{185}
-\end{textblock}
+```{r pdf000, dependson='qs'}
+den_plot(NULL, actual=NULL)
+```
 
 ## Evaluating probabilistic forecasts
 
-\begin{textblock}{18}(0.3,1.4)
-\includegraphics[width=14cm,height=20cm,keepaspectratio]{figure/qs185}
-\end{textblock}
+```{r pdf00, dependson='qs'}
+den_plot(NULL)
+```
 
-\only<2>{\begin{textblock}{4}(2,7)\fontsize{11}{11}\sf
-\textcolor{red}{Area = CRPS}
-\end{textblock}}
+## Evaluating probabilistic forecasts
 
+```{r pdf0, dependson='qs'}
+den_plot(0.5)
+```
+
+## Evaluating probabilistic forecasts
+
+```{r pdfqs, dependson='qs'}
+den_plot(0.5) / score_plot(0.5)
+```
+
+
+## Evaluating probabilistic forecasts
+
+```{r pdfqs1, dependson='qs'}
+den_plot(0.9) / score_plot(0.9)
+```
+
+
+## Evaluating probabilistic forecasts
+
+```{r pdfqs2, include=FALSE, dependson='qs', eval=FALSE}
+(plot_spacer() | den_plot(0.5)) / (crps_plot(0.5) | score_plot(0.5))
+```
 
 ## Ensemble forecasting {auto-animate="true"}
 
@@ -1032,7 +914,7 @@ auscafe |>
     arima = ARIMA(Turnover ~ pdq(d=1) + PDQ(D=1)),
     snaive = SNAIVE(Turnover)
   )  |>
-  forecast(h = "1 year") |>
+  forecast(h = "2 years") |>
   summarise(
     ets = Turnover[1],
     arima = Turnover[2],
@@ -1042,7 +924,8 @@ auscafe |>
   ) |>
   pivot_longer(ets:ensemble, names_to=".model", values_to = "Turnover") |>
   as_fable(index=Month, dist=Turnover, response="Turnover") |>
-  accuracy(data = auscafe, measures = list(rmse=RMSE, crps=CRPS))
+  accuracy(data = auscafe, measures = list(rmse=RMSE, crps=CRPS)) |>
+  arrange(crps)
 ```
 
 # Forecasting COVID-19 cases
@@ -1259,14 +1142,14 @@ cafe |>
 
 ```{r states2, echo=TRUE}
 cafe |>
-  filter(year(Month) <= 2018)
+  filter(year(Month) <= 2017)
 ```
 
 ## Forecasting many series
 
 ```{r states3, echo=TRUE}
 cafe |>
-  filter(year(Month) <= 2018) |>
+  filter(year(Month) <= 2017) |>
   model(
     ETS = ETS(Turnover),
     ARIMA = ARIMA(Turnover ~ pdq(d=1) + PDQ(D=1)),
@@ -1281,7 +1164,7 @@ cafe |>
 
 ```{r states4, echo=TRUE}
 cafe |>
-  filter(year(Month) <= 2018) |>
+  filter(year(Month) <= 2017) |>
   model(
     ETS = ETS(Turnover),
     ARIMA = ARIMA(Turnover ~ pdq(d=1) + PDQ(D=1)),
@@ -1290,14 +1173,14 @@ cafe |>
   mutate(
     COMB = (ETS+ARIMA)/2
   ) |>
-  forecast(h = "1 year")
+  forecast(h = "2 years")
 ```
 
 ## Forecasting many series
 
 ```{r states5, echo=TRUE}
 cafe |>
-  filter(year(Month) <= 2018) |>
+  filter(year(Month) <= 2017) |>
   model(
     ETS = ETS(Turnover),
     ARIMA = ARIMA(Turnover ~ pdq(d=1) + PDQ(D=1)),
@@ -1306,7 +1189,7 @@ cafe |>
   mutate(
     COMB = (ETS+ARIMA)/2
   ) |>
-  forecast(h = "1 year") |>
+  forecast(h = "2 years") |>
   accuracy(data = cafe,
     measures = list(crps=CRPS, rmse=RMSE)
   )
@@ -1316,7 +1199,7 @@ cafe |>
 
 ```{r states6, echo=TRUE}
 cafe |>
-  filter(year(Month) <= 2018) |>
+  filter(year(Month) <= 2017) |>
   model(
     ETS = ETS(Turnover),
     ARIMA = ARIMA(Turnover ~ pdq(d=1) + PDQ(D=1)),
@@ -1325,7 +1208,7 @@ cafe |>
   mutate(
     COMB = (ETS+ARIMA)/2
   ) |>
-  forecast(h = "1 year") |>
+  forecast(h = "2 years") |>
   accuracy(data = cafe,
     measures = list(ss=skill_score(CRPS))
   )
@@ -1335,7 +1218,7 @@ cafe |>
 
 ```{r states8, echo=TRUE}
 cafe |>
-  filter(year(Month) <= 2018) |>
+  filter(year(Month) <= 2017) |>
   model(
     ETS = ETS(Turnover),
     ARIMA = ARIMA(Turnover ~ pdq(d=1) + PDQ(D=1)),
@@ -1344,7 +1227,7 @@ cafe |>
   mutate(
     COMB = (ETS+ARIMA)/2
   ) |>
-  forecast(h = "1 year") |>
+  forecast(h = "2 years") |>
   accuracy(data = cafe,
     measures = list(ss=skill_score(CRPS))
   ) |>
@@ -1368,5 +1251,5 @@ Skill score is relative to seasonal naive forecasts
 
 ```{r quantiles3, dependson='quantiles'}
 p1 +
-  geom_line(aes(y = Turnover), data = auscafe |> filter(year(Month) >= 2018))
+  geom_line(aes(y = Turnover), data = auscafe |> filter(year(Month) >= 2017))
 ```
