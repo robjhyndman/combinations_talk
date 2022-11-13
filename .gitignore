@@ -6,3 +6,5 @@ renv/
 *_cache/
 *_files/
 *.rds
+figs/crps*.jpg
+figs/crps.gif

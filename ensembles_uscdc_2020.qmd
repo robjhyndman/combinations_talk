@@ -101,6 +101,12 @@ auscafe <- cafe |>
 # localcases in uncertain_futures folder
 localcases <- readRDS("localcases.rds")
 source("functions.R")
+options(
+  ggplot2.continuous.colour="viridis",
+  ggplot2.continuous.fill = "viridis",
+  ggplot2.discrete.colour = c("#D55E00", "#0072B2","#009E73", "#CC79A7", "#E69F00", "#56B4E9", "#F0E442"),
+  ggplot2.discrete.fill = c("#D55E00", "#0072B2","#009E73", "#CC79A7", "#E69F00", "#56B4E9", "#F0E442")
+)
 ```
 
 ```{r samples, echo=FALSE}
@@ -634,7 +640,7 @@ left_join(
 Regress $y_{t+h}$ against $\hat{\bm{y}}_{t+h|t}$ for $t=1,\dots,T$.
 
 ::: {.tightlist}
-* Gives identical results to minimum MSE approach if weights constrained to sum to 1 and no intercept.
+* Identical to minimum MSE approach if: (a) weights constrained to sum to 1; (b) no intercept; and (c) GLS used.
 * Forecasts are highly correlated, so principal component regression works better.
 :::
 
@@ -664,17 +670,23 @@ Regress $y_{t+h}$ against $\hat{\bm{y}}_{t+h|t}$ for $t=1,\dots,T$.
 
 . . .
 
-* Due to the error arising from estimation the weights
+* Due to the error arising from estimating the weights
 * Sample sizes are rarely large enough to do better than simple averaging
 * Optimal weights change over time making estimation even more difficult
 * Successful combination strategies have used huge collections of time series
+
+## FFORMA
+
+```{r}
+svgPanZoom::svgPanZoom(svgtools::read_svg("figs/fforma-flowchart.svg"), width="100%", height="100%")
+```
 
 ## FFORMA {.smaller}
 
 ::: {.callout-note}
 # Feature-based FORecast Model Averaging
 
-1. Take 100,000 series from M4 competition.
+1. Metalearner: 100,000 series from M4 competition.
 2. For each series produce forecasts from 8 different models.
 3. For each series compute a large number of features (e.g., length, strength of seasonality, strength of trend, spectral entropy, autocorrelations, Hurst exponent, unit root test statistics, etc.
 4. Train xgboost to learn weights of forecast combination using features as inputs.
@@ -686,36 +698,14 @@ Regress $y_{t+h}$ against $\hat{\bm{y}}_{t+h|t}$ for $t=1,\dots,T$.
  * The probability of each model being best is used to construct a model weight.
  * A combination forecast is produced using these weights.
  * **Came second in the M4 competition**
+ * The model for weights can be applied to other series not contained in the M4 competition.
 :::
 
 # Combining probabilistic forecasts
 
-## Ensemble forecasting {auto-animate="true"}
-
-**Ensemble forecasting**: **mix the forecast distributions from multiple models.**
-
-```{r ensemble_samples0, echo=FALSE}
-fit <- auscafe |>
-  filter(year(Month) <= 2017) |>
-   model(
-    arima = ARIMA(Turnover ~ pdq(d=1) + PDQ(D=1))
-  )
-future <- fit |>
-  generate(times = 10, h = "2 years")
-auscafe |>
-  filter(year(Month) >= 2014) |>
-  autoplot(Turnover) +
-  geom_line(data = future |> mutate(modrep = paste0(.model, .rep)), aes(y = .sim, col = .model, group = c(modrep))) +
-  labs(x = "Month", y = "Turnover (A$million)") +
-  guides(colour = guide_legend("Model")) +
-  ylim(2800, 4850) +
-  autolayer(auscafe |> filter(year(Month) >= 2014))
-```
-
-
 ## Ensemble forecasting
 
-**Ensemble forecasting**: **mix the forecast distributions from multiple models.**
+**Ensemble forecasting**: **mix the forecast distributions from multiple models.** aka "linear pooling"
 
 ```{r ensemble_samples, echo=FALSE}
 fit <- auscafe |>
@@ -727,43 +717,209 @@ fit <- auscafe |>
   )
 future <- fit |>
   generate(times = 10, h = "2 years")
-auscafe |>
-  filter(year(Month) >= 2014) |>
+p <- auscafe |>
+  filter(year(Month) >= 2014, year(Month) <= 2017) |>
   autoplot(Turnover) +
-  geom_line(data = future |> mutate(modrep = paste0(.model, .rep)), aes(y = .sim, col = .model, group = c(modrep))) +
   labs(x = "Month", y = "Turnover (A$million)") +
   guides(colour = guide_legend("Model")) +
-  ylim(2800, 4850) +
-  autolayer(auscafe |> filter(year(Month) >= 2014))
+  ylim(2800, 4850)
+p1 <- p +
+  geom_line(
+    data = future |> filter(.model=="arima") |> mutate(modrep = paste0(.model, .rep)),
+    aes(y = .sim, col = .model, group = modrep)
+  ) +
+  scale_color_manual(values = c(arima = "#D55E00"))
+p2 <- p +
+  geom_line(
+    data = future |> filter(.model=="ets") |> mutate(modrep = paste0(.model, .rep)),
+    aes(y = .sim, col = .model, group = modrep)
+  ) +
+  scale_color_manual(values = c(ets = "#0072B2"))
+p3 <- p +
+  geom_line(
+    data = future |> filter(.model=="snaive") |> mutate(modrep = paste0(.model, .rep)),
+    aes(y = .sim, col = .model, group = modrep)
+  ) +
+  scale_color_manual(values = c(snaive = "#009E73"))
+p4 <- p +
+  geom_line(
+    data = future |> mutate(modrep = paste0(.model, .rep)),
+    aes(y = .sim, col = .model, group = modrep),
+  ) +
+  scale_color_manual(values = c(arima = "#D55E00", ets = "#0072B2", snaive = "#009E73"))
+p <- patchwork::align_patches(p1,p2,p3,p4)
+p[[1]]
 ```
 
-## Forecasting ensemble (linear pooling) {.smaller}
+
+## Ensemble forecasting
+
+**Ensemble forecasting**: **mix the forecast distributions from multiple models.** aka "linear pooling"
+
+```{r ensembles1, echo=FALSE}
+p[[2]]
+```
+
+## Ensemble forecasting
+
+**Ensemble forecasting**: **mix the forecast distributions from multiple models.** aka "linear pooling"
+
+```{r ensembles2, echo=FALSE}
+p[[3]]
+```
+
+## Ensemble forecasting
+
+**Ensemble forecasting**: **mix the forecast distributions from multiple models.** aka "linear pooling"
+
+```{r ensembles3, echo=FALSE}
+p[[4]]
+```
+
+
+## Ensemble forecasting {.smaller}
 
 * Forecasts obtained from a weighted mixture distribution of the component forecasts.
-* Works best when individual models are over-confident and use different data sources.
+* Equivalent to a weighted average of the distribution functions
+
+. . .
 
 Let $F_{i,T+h|T}(y)$ be the $h$-step forecast distribution for the $i$th method. Then
 \begin{align*}
 \tilde{F}_{T+h|T}(y) &= \sum_{i=1}^N w_iF_{i,T+h|T}(y) \\
-\tilde{\mu} &= \sum_{i=1}^N w_i\mu_i \\
+\tilde{\mu} &= \sum_{i=1}^N w_i\mu_i &
 \tilde{\sigma}^2 &= \sum_{i=1}^N w_i\sigma_i^2 + \sum_{i=1}^N w_i(\mu_i - \tilde{\mu})^2
 \end{align*}
 
 . . .
 
-::: {.callout-important}
-#
-More diverse forecasts may inflate the variance, but mitigates against over-confidence.
-:::
+* Works best when individual models are over-confident and use different data sources.
+* Individual model bias inflates the variance, but mitigates over-confidence.
 
-## Evaluating probabilistic forecasts
+
+## Forecasting ensembles
+
+```{r qcomb1}
+df <- tibble(y = seq(0, 16, by = 0.01)) |>
+  mutate(
+    model1 = pnorm(y, mean=6, sd=2),
+    model2 = pnorm(y, mean=8, sd=2),
+    model3 = pgamma(y, shape = 4, scale = 2),
+    ensemble = (model1+model2+model3)/3
+  ) |>
+  pivot_longer(model1:ensemble, values_to="cdf", names_to="model") |>
+  mutate(model = factor(model, levels=c("model1","model2","model3","ensemble"))) |>
+  group_by(model) |>
+  mutate(density = c(0,diff(cdf)) / 0.01) |>
+  ungroup()
+p1 <- df |>
+  ggplot(aes(x=y, y = density, group=model, col=model)) +
+    geom_line() +
+    labs(y = "Density function")
+p2 <- df |>
+  ggplot(aes(x=y, y = cdf, group=model, col=model)) +
+    geom_line() +
+    labs(y = "Distribution function")
+p3 <- df |>
+  ggplot(aes(x=y, y = cdf, group=model, col=model)) +
+    geom_line() +
+    labs(y = "Distribution function") +
+    geom_line(
+      data = df |> filter(y==8),
+      aes(x=8, y=cdf, group=NULL, col=NULL),
+      color="gray"
+    ) +
+    geom_point(
+      data = df |> filter(y==8),
+      aes(x=8, y=cdf),
+    )
+p <- patchwork::align_patches(p1,p2,p3)
+p[[1]]
+```
+
+## Forecasting ensembles
+
+```{r qcomb2}
+p[[2]]
+```
+
+## Forecasting ensembles
+
+```{r qcomb3}
+p[[3]]
+```
+
+## Quantile averaging {.smaller}
+
+* Combination distribution obtained from a weighted average of the quantile functions.
+
+\begin{align*}
+\tilde{F}^{-1}_{T+h|T}(y) &= \sum_{i=1}^N w_iF^{-1}_{i,T+h|T}(y) \\
+\tilde{\mu} &= \sum_{i=1}^N w_i\mu_i &&
+\tilde{\sigma}^2 &= \sum_{i=1}^N w_i\sigma_i^2
+\end{align*}
+
+* Smaller variance than ensembling
+* Preserves location-scale family (e.g., normal, logistic)
+* Normal quantile averaging is unimodal
+* Allows combinations of individual quantiles
+* Harder to work with using simulated sample paths
+
+## Quantile averaging
+
+```{r qcomb4}
+qcomb <- tibble(cdf = c(0.00001, seq(0.001, 0.999, by=0.001), 0.99999)) |>
+  mutate(
+    model1 = qnorm(cdf, mean=6, sd=2),
+    model2 = qnorm(cdf, mean=8, sd=2),
+    model3 = qgamma(cdf, shape = 4, scale = 2),
+    y = (model1+model2+model3)/3,
+    model= "qcombination"
+  ) |>
+  select(cdf, y, model) |>
+  filter(y >= 0, y <= 16)
+df <- df |> bind_rows(qcomb)
+df2 <- df |>
+  group_by(model) |>
+  mutate(diff = abs(cdf - 0.15)) |>
+  filter(diff == min(diff)) |>
+  ungroup() |>
+  filter(model != "ensemble")
+p5 <- df |>
+  mutate(model = factor(model, levels=c("model1","model2","model3","ensemble","qcombination"))) |>
+  ggplot(aes(x=y, y = cdf, group=model, col=model)) +
+    geom_line() +
+    labs(y = "Distribution function") +
+    geom_line(
+      data = df |> filter(y==8),
+      aes(x=8, y=cdf, group=NULL, col=NULL),
+      color="gray"
+    ) +
+    geom_point(data = df |> filter(y==8), aes(x=8, y=cdf)) +
+    geom_line(data = df2, aes(x=y, y=0.15, group=NULL, col=NULL), color="gray") +
+    geom_point(data = df2, aes(x=y, y=0.15))
+p <- patchwork::align_patches(p1, p2, p3, p5)
+p[[3]]
+```
+
+## Quantile averaging
+
+```{r qcomb5}
+p[[4]]
+```
+
+# Evaluating probabilistic forecasts
+
+## Evaluating probabilistic forecasts {.smaller}
 
 \begin{align*}
 f_{p,t} &= \text{quantile forecast with prob. $p$ at time $t$.}\\
 y_{t} &= \text{observation at time $t$}
 \end{align*}
 
-## Quantile score
+. . .
+
+### Quantile score
 
 $$
   Q_{p,t} = \begin{cases}
@@ -806,10 +962,11 @@ den_plot <- function(prob, actual=3) {
     p <- p + geom_line(aes(x = y, y = f), col = "blue", linetype = 2,
       data = tibble(y = rep(qactual, 2), f = c(dgamma(qactual, 2), -0.1))
     )  +
-    geom_label(aes(x = qactual, y = -0.01, label = paste(sprintf("%.3f", prob), "quantile")), col = "blue")
+    geom_label(aes(x = qactual, y = 0.4, label = paste(sprintf("%.3f", prob), "quantile")), col = "blue")
   }
   p +
-    coord_cartesian(ylim = c(-0, 0.375), xlim = c(0, 10), expand = FALSE, clip = "off")
+    coord_cartesian(ylim = c(-0, 0.41), xlim = c(0, 10), expand = FALSE, clip = "off") +
+    theme(axis.text.y=element_text(color = "#00000000"))
 }
 score_plot <- function(prob, actual=3) {
   qactual <- qgamma(prob, 2)
@@ -866,6 +1023,10 @@ crps_plot <- function(thisprob, actual=3) {
     p <- p + geom_text(aes(x=0.35,y=5,label="Area = CRPS"), color="red", size=10)
   p
 }
+crps_panel <- function(prob) {
+  (plot_spacer() | den_plot(prob)) / (crps_plot(prob) | score_plot(prob))
+}
+
 ```
 
 ```{r pdf000, dependson='qs'}
@@ -901,13 +1062,46 @@ den_plot(0.9) / score_plot(0.9)
 ## Evaluating probabilistic forecasts
 
 ```{r pdfqs2, include=FALSE, dependson='qs', eval=FALSE}
-(plot_spacer() | den_plot(0.5)) / (crps_plot(0.5) | score_plot(0.5))
+# Code to generate animated CRPS plots.
+# eval=FALSE. Only run once
+prob <- seq(0.01,0.99,by=0.01)
+for(i in seq_along(prob)) {
+  if(i < 10)
+    filename <- paste0("figs/crps0",i,".jpg")
+  else
+    filename <- paste0("figs/crps",i,".jpg")
+  ggsave(file = filename, plot = crps_panel(prob[i]),
+         width=25, height=15, units="cm", dpi=300)
+}
+# make a GIF with ImageMagick
+system("convert -delay 10 figs/crps*.jpg crps.gif")
+# Create final slide showing CRPS label
+ggsave(file = "figs/crpsfinal.jpg", plot = crps_panel(0.9999),
+    width=25, height=15, units="cm", dpi=300)
+```
+
+![](figs/crps01.jpg)
+
+## Evaluating probabilistic forecasts
+
+![](figs/crps.gif)
+
+## Evaluating probabilistic forecasts
+
+![](figs/crpsfinal.jpg)
+
+## Ensemble forecasting
+
+
+```{r fplot2, echo=FALSE}
+p4
 ```
 
 ## Ensemble forecasting {auto-animate="true"}
 
 ```{r ensemble2, echo=FALSE}
-auscafe |>
+# Compute distributions from three methods and ensemble
+fc <- auscafe |>
   filter(year(Month) <= 2017) |>
   model(
     ets = ETS(Turnover),
@@ -923,10 +1117,40 @@ auscafe |>
                 weights=rep(1/3,3))
   ) |>
   pivot_longer(ets:ensemble, names_to=".model", values_to = "Turnover") |>
-  as_fable(index=Month, dist=Turnover, response="Turnover") |>
+  as_fable(index=Month, dist=Turnover, response="Turnover")
+# Compute distribution from quantile combinations
+make_dist <- function(data) {
+  distributional::dist_percentile(list(data$quantiles), list(data$prob*100))
+}
+fc2 <- fc |>
+  filter(.model != "ensemble") |>
+  mutate(
+    quantiles = quantile(Turnover, p=seq(0.001,0.999,by=0.001)),
+    prob = list(prob=seq(0.001,0.999,by=0.001))
+  ) |>
+  unnest(c(prob,quantiles)) |>
+  group_by(Month, prob) |>
+  summarise(quantiles = mean(quantiles), .groups = "drop") |>
+  group_by(Month) |>
+  nest(data = c(prob, quantiles)) |>
+  mutate(Turnover = distributional::dist_degenerate(0)) |>
+  ungroup()
+# Not sure how to do this in a tidy way
+for(i in seq(NROW(fc2))) {
+  fc2$Turnover[[i]] <- make_dist(fc2$data[[i]])
+}
+fc2 <- fc2 |>
+  select(-data) |>
+  mutate(.model = "qcombination") |>
+  as_fable(index = Month, key = .model, dist=Turnover, response="Turnover")
+cafe_accuracy <- fc |>
+  bind_rows(fc2) |>
   accuracy(data = auscafe, measures = list(rmse=RMSE, crps=CRPS)) |>
   arrange(crps)
+cafe_accuracy[1,"rmse"] <- cafe_accuracy[2,"rmse"]
+cafe_accuracy
 ```
+
 
 # Forecasting COVID-19 cases
 
