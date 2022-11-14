@@ -1,0 +1,24 @@
+---
+title: "Forecasting ensembles and combinations"
+author: Rob J Hyndman
+institute: "<img src='figs/monash_bw.png' width=300>"
+date: "15 November 2022"
+date-format: "D MMMM YYYY"
+abstract: "Forecast combination methods have flourished remarkably over the past 50 years, and are now part of the mainstream of forecasting research and practice. Combining multiple forecasts produced from multiple models is used to improve accuracy through the integration of information gleaned from different sources. Combination schemes have evolved from simple combination methods without estimation, to sophisticated methods involving time-varying weights, nonlinear combinations, correlations among components, and cross-learning. They include combining point forecasts, and combining probabilistic forecasts. I will provide a tutorial review on using forecasting combinations in practice, based on implementations using R. I will highlight the potential and limitations of the available methods, and some suggestions for best practice."
+time: 45 mins
+format:
+  revealjs
+---
+
+```{r}
+#| output: asis
+
+for(i in 1:8) {
+  cat("## Evaluating probabilistic forecasts")
+  
+  print(glue::glue("![](figs/crps_{i}.jpg)"))
+}
+
+```
+
+  
