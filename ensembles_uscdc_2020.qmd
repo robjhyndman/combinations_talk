@@ -675,17 +675,97 @@ Regress $y_{t+h}$ against $\hat{\bm{y}}_{t+h|t}$ for $t=1,\dots,T$.
 * Optimal weights change over time making estimation even more difficult
 * Successful combination strategies have used huge collections of time series
 
-## FFORMA
+# FFORMS & FFORMA
+
+## Forecast model selection
+
+### Example features used
+
+::: {.columns}
+
+::: {.column width="33%"}
+  * length
+  * strength of seasonality
+  * strength of trend
+  * linearity
+  * curvature
+  * KL divergence between segments
+:::
+::: {.column width="33%"}
+
+  * unit root test statistics
+  * ACF and PACF values
+  * Optimal transformation parameter
+  * first ACF value of remainder series
+:::
+::: {.column width="33%"}
+  * parameter estimates of Holt's model
+  * spectral entropy
+  * Hurst exponent
+  * nonlinearity
+  * spikiness
+  * stability
+  * lumpiness
+:::
+::::
+
+## FFORMS: [Feature-based FORecast Model Selection]{style="font-size: 65%;"}
+
+  * Use features to select the best forecasting model.
+  * Train a random forest classifier on a large set of time series with training/test splits
+  * Classifier to select method with lowest test set forecasting error
+
+::: aside
+Talagala, Hyndman & Athanasopoulos (2018) "Meta-learning how to forecast time series"
+[robjhyndman.com/publications/fforms/](https://robjhyndman.com/publications/fforms/)
+:::
+
+###
+
+## FFORMA: [Feature-based FORecast Model Averaging]{style="font-size: 65%;"}
+
+ * Like FFORMS but we use xgboost rather than a random forest.
+ * The optimization criterion is forecast accuracy not classification accuracy.
+ * The probability of each model being best is used to construct a model weight.
+ * A combination forecast is produced using these weights.
+ * **Came second in the M4 competition**
+
+::: aside
+Montero-Manso, Athanasopoulos, Hyndman & Talagala (IJF 2020) "FFORMA: Feature-based Forecast Model Averaging"
+[robjhyndman.com/publications/fforma/](https://robjhyndman.com/publications/fforma/)
+:::
+
+## FFORMA: [Feature-based FORecast Model Averaging]{style="font-size: 65%;"}
+
+### Models included
+
+1. Naive
+1. Seasonal naive
+1. Random walk with drift
+1. Theta method
+1. ARIMA
+1. ETS
+1. TBATS
+1. STLM-AR
+
+::: aside
+Montero-Manso, Athanasopoulos, Hyndman & Talagala (IJF 2020) "FFORMA: Feature-based Forecast Model Averaging"
+[robjhyndman.com/publications/fforma/](https://robjhyndman.com/publications/fforma/)
+:::
+
+
+## FFORMA: [Feature-based FORecast Model Averaging]{style="font-size: 65%;"}
+
 
 ```{r fforma_flowchart}
 svgPanZoom::svgPanZoom(svgtools::read_svg("figs/fforma-flowchart.svg"), width="100%", height="100%")
 ```
 
-## FFORMA {.smaller}
+
+## FFORMA: [Feature-based FORecast Model Averaging]{style="font-size: 65%;"} {.smaller}
 
 ::: {.callout-note}
-# Feature-based FORecast Model Averaging
-
+#
 1. Metalearner: 100,000 series from M4 competition.
 2. For each series produce forecasts from 8 different models.
 3. For each series compute a large number of features (e.g., length, strength of seasonality, strength of trend, spectral entropy, autocorrelations, Hurst exponent, unit root test statistics, etc.
@@ -697,9 +777,14 @@ svgPanZoom::svgPanZoom(svgtools::read_svg("figs/fforma-flowchart.svg"), width="1
 ::: {.tightlist}
  * The probability of each model being best is used to construct a model weight.
  * A combination forecast is produced using these weights.
- * **Came second in the M4 competition**
  * The model for weights can be applied to other series not contained in the M4 competition.
 :::
+
+## R Packages
+
+ * **seer**: FFORMS --- selecting forecasting model using features. [github.com/thiyangt/seer](https://github.com/thiyangt/seer)
+
+ * **M4metalearning**: FFORMA -- forecast combinations using features to choose weights. [github.com/robjhyndman/M4metalearning](https://github.com/robjhyndman/M4metalearning)
 
 # Combining probabilistic forecasts
 
