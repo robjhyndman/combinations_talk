@@ -1066,6 +1066,7 @@ score_plot <- function(prob, actual=3) {
       y = seq(0, 10, l = 101),
       Q = qp(prob, y)
     ) |>
+    filter(Q <= 2.5) |>
     ggplot(aes(x = y, y = Q)) +
     geom_line() +
     labs(
@@ -1140,7 +1141,7 @@ ggsave(file = "figs/crps_3.jpg",
        plot = den_plot(0.9),
        width=25, height=15, units="cm", dpi=300)
 ggsave(file = "figs/crps_4.jpg",
-       plot = den_plot(0.9) / score_plot(0.9),
+       plot = den_plot(0.9, show_qline = FALSE) / score_plot(0.9),
        width=25, height=15, units="cm", dpi=300)
 ggsave(file = "figs/crps_5.jpg",
        plot = crps_panel(0.9, fill=FALSE),
@@ -1156,13 +1157,38 @@ ggsave(file = "figs/crps_8.jpg",
        width=25, height=15, units="cm", dpi=300)
 ```
 
-```{r crpsgraphs}
-#| output: asis
-for(i in seq(8)) {
-  cat("## Evaluating probabilistic forecasts\n\n")
-  cat(paste0("![](figs/crps_",i,".jpg)\n\n"))
-}
-```
+## Evaluating probabilistic forecasts
+
+![](figs/crps_1.jpg)
+
+## Evaluating probabilistic forecasts
+
+![](figs/crps_2.jpg)
+
+## Evaluating probabilistic forecasts
+
+![](figs/crps_3.jpg)
+
+## Evaluating probabilistic forecasts
+
+![](figs/crps_4.jpg)
+
+## Evaluating probabilistic forecasts
+
+![](figs/crps_5.jpg)
+
+## Evaluating probabilistic forecasts
+
+![](figs/crps_6.jpg)
+
+## Evaluating probabilistic forecasts
+
+![](figs/crps_7.jpg)
+
+## Evaluating probabilistic forecasts
+
+![](figs/crps_8.jpg)
+
 
 ## Evaluating probabilistic forecasts
 
