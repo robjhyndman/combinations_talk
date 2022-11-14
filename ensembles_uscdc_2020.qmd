@@ -1028,14 +1028,14 @@ qp <- function(p, y) {
   fp <- qgamma(p, 2)
   2 * (1 - p) * abs(y - fp) * (y < fp) + 2 * p * abs(y - fp) * (y >= fp)
 }
-den_plot <- function(prob, actual=3) {
+den_plot <- function(prob, actual=3, show_qline = TRUE) {
   p <- tibble(
       y = seq(0, 10, l = 101),
       f = dgamma(y, 2)
     ) |>
     ggplot(aes(x = y, y = f)) +
     geom_line() +
-    labs(y = "Forecasting probability density", x = latex2exp::TeX("Quantile $q_{p}$"))
+    labs(y = "Forecasting density", x = latex2exp::TeX("Quantile $q_{p}$"))
   if(!is.null(actual)) {
     p <- p + geom_point(aes(x = actual, y = y), data = tibble(actual = actual, y = 0)) +
       geom_label(aes(x = actual, y = 0.02, label = "Actual"))
@@ -1044,10 +1044,17 @@ den_plot <- function(prob, actual=3) {
     qactual <- qgamma(prob, 2)
     if(!is.null(actual))
       qpactual <- qp(prob, actual)
-    p <- p + geom_line(aes(x = y, y = f), col = "blue", linetype = 2,
-      data = tibble(y = rep(qactual, 2), f = c(dgamma(qactual, 2), -0.1))
-    )  +
-    geom_label(aes(x = qactual, y = 0.4, label = paste(sprintf("%.3f", prob), "quantile")), col = "blue")
+      p <- p + geom_label(
+        aes(x = qactual, y = 0.4,
+        label = paste(sprintf("%.3f", prob), "quantile")),
+        col = "blue"
+      )
+      if(show_qline) {
+        p <- p +
+         geom_line(aes(x = y, y = f), col = "blue", linetype = 2,
+            data = tibble(y = rep(qactual, 2), f = c(dgamma(qactual, 2), -0.1))
+         )
+      }
   }
   p +
     coord_cartesian(ylim = c(-0, 0.41), xlim = c(0, 10), expand = FALSE, clip = "off") +
@@ -1068,7 +1075,7 @@ score_plot <- function(prob, actual=3) {
     ) +
     geom_line(aes(x = y, y = Q),
       col = "red", linetype = 2,
-      data = tibble(y = rep(actual, 2), Q = c(14.5, qpactual))
+      data = tibble(y = rep(actual, 2), Q = c(16, qpactual))
     ) +
     geom_line(aes(x = y, y = Q),
       col = "red", linetype = 2,
@@ -1076,12 +1083,12 @@ score_plot <- function(prob, actual=3) {
     ) +
     geom_line(aes(x = y, y = f),
       col = "blue", linetype = 2,
-      data = tibble(y = rep(qactual, 2), f = c(0, 12))
+      data = tibble(y = rep(qactual, 2), f = c(0, 16))
     ) +
     #geom_label(aes(x = qactual, y = 11.6, label = paste(sprintf("%.3f", prob), "quantile")), col = "blue") +
-    coord_cartesian(ylim = c(0, 11.6), xlim = c(0, 10), expand = FALSE, clip = "off")
+    coord_cartesian(ylim = c(0, 2.5), xlim = c(0, 10), expand = FALSE, clip = "off")
 }
-crps_plot <- function(thisprob, actual=3) {
+crps_plot <- function(thisprob, actual=3, otherprob=NULL, fill=TRUE) {
   qpactual <- qp(thisprob, actual)
   qs <- seq(0, 10, l = 200)
   prob <- pgamma(qs, 2)
@@ -1093,56 +1100,94 @@ crps_plot <- function(thisprob, actual=3) {
     filter(p <= thisprob)
   p <- p3data |>
     ggplot(aes(x = p, y = Q)) +
-    geom_line(col = "red") +
-    geom_polygon(
+    geom_line(data = tibble(p = c(thisprob, 1), Q = rep(qpactual, 2)), col = "red", linetype = 2)
+  if(!is.null(otherprob)) {
+    extrapoints <- tibble(
+      p = otherprob,
+      Q = qp(otherprob, actual)
+    )
+    p <- p + geom_point(col='red', data=extrapoints)
+  }
+  if(fill) {
+    p <- p + geom_polygon(
       fill = "#ffbbbb",
-      data = bind_rows(p3data, tibble(p = thisprob, Q = 0))
-    ) +
-    geom_line(data = tibble(p = c(thisprob, 1), Q = rep(qpactual, 2)), col = "red", linetype = 2) +
+      data = bind_rows(p3data, tibble(p = rep(thisprob, 2), Q = c(qpactual, 0)))
+    )
+  }
+if(thisprob < 0.998) {
+  p <- p + geom_point(col='red', data=tibble(p=thisprob, Q = qp(thisprob, actual)))
+  }
+  p <- p +
     labs(
       x = latex2exp::TeX("Probability p"),
       y = latex2exp::TeX("Quantile score $S_{p}$")
     ) +
-    coord_cartesian(ylim = c(0, 11.6), xlim = c(0, 1), expand = FALSE, clip = "off")
+    coord_cartesian(ylim = c(0, 2.5), xlim = c(0, 1), expand = FALSE, clip = "off")
   if(thisprob > 0.995)
-    p <- p + geom_text(aes(x=0.35,y=5,label="Area = CRPS"), color="red", size=10)
+    p <- p + geom_text(aes(x=0.35,y=2,label="Area = CRPS"), color="red", size=10)
   p
 }
-crps_panel <- function(prob) {
-  (plot_spacer() | den_plot(prob)) / (crps_plot(prob) | score_plot(prob))
+crps_panel <- function(prob, ...) {
+  (plot_spacer() | den_plot(prob, show_qline = FALSE)) / (crps_plot(prob, ...) | score_plot(prob))
 }
-
-```
-
-```{r pdf000, dependson='qs'}
-den_plot(NULL, actual=NULL)
+# Save some figures to ensure same size
+ggsave(file = "figs/crps_1.jpg",
+       plot = den_plot(NULL, actual=NULL),
+       width=25, height=15, units="cm", dpi=300)
+ggsave(file = "figs/crps_2.jpg",
+       plot = den_plot(NULL),
+       width=25, height=15, units="cm", dpi=300)
+ggsave(file = "figs/crps_3.jpg",
+       plot = den_plot(0.9),
+       width=25, height=15, units="cm", dpi=300)
+ggsave(file = "figs/crps_4.jpg",
+       plot = den_plot(0.9) / score_plot(0.9),
+       width=25, height=15, units="cm", dpi=300)
+ggsave(file = "figs/crps_5.jpg",
+       plot = crps_panel(0.9, fill=FALSE),
+       width=25, height=15, units="cm", dpi=300)
+ggsave(file = "figs/crps_6.jpg",
+       plot = crps_panel(0.5, fill=FALSE, otherprob = 0.9),
+       width=25, height=15, units="cm", dpi=300)
+ggsave(file = "figs/crps_7.jpg",
+       plot = crps_panel(0.3, fill=FALSE, otherprob = c(0.5, 0.9)),
+       width=25, height=15, units="cm", dpi=300)
+ggsave(file = "figs/crps_8.jpg",
+       plot = crps_panel(0.01, fill=FALSE, otherprob = c(0.3, 0.5, 0.9)),
+       width=25, height=15, units="cm", dpi=300)
 ```
 
 ## Evaluating probabilistic forecasts
 
-```{r pdf00, dependson='qs'}
-den_plot(NULL)
-```
+![](figs/crps_1.jpg)
 
 ## Evaluating probabilistic forecasts
 
-```{r pdf0, dependson='qs'}
-den_plot(0.5)
-```
+![](figs/crps_2.jpg)
 
 ## Evaluating probabilistic forecasts
 
-```{r pdfqs, dependson='qs'}
-den_plot(0.5) / score_plot(0.5)
-```
-
+![](figs/crps_3.jpg)
 
 ## Evaluating probabilistic forecasts
 
-```{r pdfqs1, dependson='qs'}
-den_plot(0.9) / score_plot(0.9)
-```
+![](figs/crps_4.jpg)
 
+## Evaluating probabilistic forecasts
+
+![](figs/crps_5.jpg)
+
+## Evaluating probabilistic forecasts
+
+![](figs/crps_6.jpg)
+
+## Evaluating probabilistic forecasts
+
+![](figs/crps_7.jpg)
+
+## Evaluating probabilistic forecasts
+
+![](figs/crps_8.jpg)
 
 ## Evaluating probabilistic forecasts
 
@@ -1152,14 +1197,14 @@ den_plot(0.9) / score_plot(0.9)
 prob <- seq(0.01,0.99,by=0.01)
 for(i in seq_along(prob)) {
   if(i < 10)
-    filename <- paste0("figs/crps0",i,".jpg")
+    filename <- paste0("figs/crpsgif0",i,".jpg")
   else
-    filename <- paste0("figs/crps",i,".jpg")
+    filename <- paste0("figs/crpsgif",i,".jpg")
   ggsave(file = filename, plot = crps_panel(prob[i]),
          width=25, height=15, units="cm", dpi=300)
 }
 # make a GIF with ImageMagick
-system("convert -delay 10 figs/crps*.jpg figs/crps.gif")
+system("convert -delay 10 figs/crpsgif*.jpg figs/crps.gif")
 # Create final slide showing CRPS label
 ggsave(file = "figs/crpsfinal.jpg", plot = crps_panel(0.9999),
     width=25, height=15, units="cm", dpi=300)
