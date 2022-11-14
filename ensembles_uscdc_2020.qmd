@@ -1017,7 +1017,6 @@ $$
 -   $Q_{p,t}$ like absolute error (weighted to account for likely exceedance)
 -   Average $Q_{p,t}$ over $p$ = CRPS (Continuous Rank Probability Score)
 
-## Evaluating probabilistic forecasts
 
 ```{r qs, include=FALSE}
 # Run to generate the graphs
@@ -1157,37 +1156,13 @@ ggsave(file = "figs/crps_8.jpg",
        width=25, height=15, units="cm", dpi=300)
 ```
 
-## Evaluating probabilistic forecasts
-
-![](figs/crps_1.jpg)
-
-## Evaluating probabilistic forecasts
-
-![](figs/crps_2.jpg)
-
-## Evaluating probabilistic forecasts
-
-![](figs/crps_3.jpg)
-
-## Evaluating probabilistic forecasts
-
-![](figs/crps_4.jpg)
-
-## Evaluating probabilistic forecasts
-
-![](figs/crps_5.jpg)
-
-## Evaluating probabilistic forecasts
-
-![](figs/crps_6.jpg)
-
-## Evaluating probabilistic forecasts
-
-![](figs/crps_7.jpg)
-
-## Evaluating probabilistic forecasts
-
-![](figs/crps_8.jpg)
+```{r crpsgraphs}
+#| output: asis
+for(i in seq(8)) {
+  cat("## Evaluating probabilistic forecasts\n\n")
+  cat(paste0("![](figs/crps_",i,".jpg)\n\n"))
+}
+```
 
 ## Evaluating probabilistic forecasts
 
@@ -1209,10 +1184,6 @@ system("convert -delay 10 figs/crpsgif*.jpg figs/crps.gif")
 ggsave(file = "figs/crpsfinal.jpg", plot = crps_panel(0.9999),
     width=25, height=15, units="cm", dpi=300)
 ```
-
-![](figs/crps01.jpg)
-
-## Evaluating probabilistic forecasts
 
 ![](figs/crps.gif)
 
