@@ -193,7 +193,7 @@ p1 +
 :::
 ::::
 
-## Australian monthly café turnover {auto-animate="true"}
+## Australian monthly café turnover
 
 ```{r data2, echo=FALSE, dependson='samples'}
 p1 +
@@ -297,7 +297,7 @@ p1
 
 :::
 
-## The tsibble class {auto-animate="true"}
+## The tsibble class
 
 ```{r fable, echo=TRUE}
 library(tidyverse)
@@ -306,7 +306,7 @@ library(fable)
 auscafe
 ```
 
-## Using the fable package {auto-animate="true"}
+## Using the fable package
 
 ```{r fable1, echo=TRUE}
 auscafe |>
@@ -318,7 +318,7 @@ auscafe |>
   )
 ```
 
-## Using the fable package {auto-animate="true"}
+## Using the fable package
 ```{r combinations2, echo=TRUE}
 auscafe |>
   filter(year(Month) <= 2017) |>
@@ -330,7 +330,7 @@ auscafe |>
   mutate(ensemble = (ets + arima + snaive)/3)
 ```
 
-## Using the fable package {auto-animate="true"}
+## Using the fable package
 
 ```{r combinations3, echo=TRUE}
 auscafe |>
@@ -345,7 +345,7 @@ auscafe |>
 ```
 
 
-## Using the fable package {auto-animate="true"}
+## Using the fable package
 
 ```{r combinations4, echo=TRUE}
 auscafe |>
@@ -364,7 +364,7 @@ auscafe |>
   arrange(rmse)
 ```
 
-## Using the fable package {auto-animate="true"}
+## Using the fable package
 
 ```{r fplot, echo=FALSE}
 auscafe |>
@@ -677,7 +677,7 @@ Regress $y_{t+h}$ against $\hat{\bm{y}}_{t+h|t}$ for $t=1,\dots,T$.
 
 ## FFORMA
 
-```{r}
+```{r fforma_flowchart}
 svgPanZoom::svgPanZoom(svgtools::read_svg("figs/fforma-flowchart.svg"), width="100%", height="100%")
 ```
 
@@ -1074,7 +1074,7 @@ for(i in seq_along(prob)) {
          width=25, height=15, units="cm", dpi=300)
 }
 # make a GIF with ImageMagick
-system("convert -delay 10 figs/crps*.jpg crps.gif")
+system("convert -delay 10 figs/crps*.jpg figs/crps.gif")
 # Create final slide showing CRPS label
 ggsave(file = "figs/crpsfinal.jpg", plot = crps_panel(0.9999),
     width=25, height=15, units="cm", dpi=300)
@@ -1156,37 +1156,45 @@ cafe_accuracy
 
 ## Forecasting COVID-19 cases
 
-\placefig{0}{1.35}{height=9.2cm, width=20cm}{covid}
+![](figs/covid.jpg)
 
 ## Australian Health Protection Principal Committee
 
-\begin{block}{}The \textbf{Australian Health Protection Principal Committee} is the key decision-making committee for national health emergencies. It comprises all state and territory Chief Health Officers and is chaired by the Australian Chief Medical Officer.
-\end{block}
+::: {.callout-warning}
+###
+The **Australian Health Protection Principal Committee** is the key decision-making committee for national health emergencies. It comprises all state and territory Chief Health Officers and is chaired by the Australian Chief Medical Officer.
 
-\begin{alertblock}{COVID-19 forecasting group}
-\begin{multicols}{3}\small
-\begin{itemize}\tightlist
-\item Adeshina Adekunle
-\item August Hao
-\item David J Price
-\item Dennis Liu
-\item Freya M Shearer
-\item Gerry Ryan
-\item James M McCaw
-\item Joshua V Ross
-\item Michael Lydeamore
-\item Mitchell \rlap{O'Hara-Wild}
-\item Nicholas Tierney
-\item Pablo \rlap{Montero-Manso}
-\item Nick Golding
-\item Peter Dawson
-\item Rob J Hyndman
-\item Robert Moss
-\item Ruarai Tobin
-\item Tobin South
-\end{itemize}
-\end{multicols}\vspace*{-0.2cm}
-\end{alertblock}
+:::
+
+::: {.callout-important}
+###
+:::: {.columns}
+::: {.column width="33%"}
+  * Adeshina Adekunle
+  * August Hao
+  * David J Price
+  * Dennis Liu
+  * Freya M Shearer
+  * Gerry Ryan
+:::
+::: {.column width="33%"}
+  * James M McCaw
+  * Joshua V Ross
+  * Michael Lydeamore
+  * Mitchell O'Hara-Wild
+  * Nicholas Tierney
+  * Pablo Montero-Manso
+:::
+::: {.column width="33%"}
+  * Nick Golding
+  * Peter Dawson
+  * Rob J Hyndman
+  * Robert Moss
+  * Ruarai Tobin
+  * Tobin South
+:::
+::::
+:::
 
 ## Data sources
 
@@ -1217,9 +1225,9 @@ localcases |>
     breaks = seq(as.Date("2020-01-01"), by="1 month", length=35),
     minor_breaks = NULL,
     labels = c(
-      "J\n 2020","F","M","A","M","J","J","A","S","O","N","D",
-      "J\n 2021","F","M","A","M","J","J","A","S","O","N","D",
-      "J\n 2022","F","M","A","M","J","J","A","S","O","N")
+      "J\n   2020","F","M","A","M","J","J","A","S","O","N","D",
+      "J\n   2021","F","M","A","M","J","J","A","S","O","N","D",
+      "J\n   2022","F","M","A","M","J","J","A","S","O","N")
   ) +
   scale_color_manual(values = state_colours) +
   scale_y_log10(breaks = 10^(1:5),
@@ -1229,17 +1237,16 @@ localcases |>
 * Recent case numbers are uncertain and incomplete as date of onset is not known until symptoms show and a test is obtained.
 
 ## A model ensemble
-\fontsize{14}{16}\sf
 
-### Model 1: SEEIIR (Uni Melbourne/Doherty Institute)
+#### Model 1: SEEIIR (Uni Melbourne/Doherty Institute)
 
 * Stochastic compartmental model with time-varying effective reproduction number.
 
-### Model 2: Generative model (Uni Adelaide)
+#### Model 2: Generative model (Uni Adelaide)
 
 * Simulation with three types of infectious individuals: imported, asymptomatic, symptomatic
 
-### Model 3: Global AR model (Monash)
+#### Model 3: Global AR model (Monash)
 
 * Single model fitted to all Johns Hopkins data from countries and regions with sufficient data.
 * Series with obvious anomalies removed.
@@ -1263,7 +1270,7 @@ samples <- readRDS("samples.rds")
 ensemble <- make_ensemble(samples)
 ```
 
-```{r some_plots, include=FALSE, eval=FALSE}
+```{r some_plots, include=FALSE}
 vic_ensemble <- ensemble |> filter(state == "VIC")
 origins <- sort(unique(vic_ensemble$forecast_origin))
 origins <- origins[c(2, 8, 11, 33, 48, 88, 106)]
@@ -1294,23 +1301,39 @@ for (i in seq_along(origins)) {
     ) +
     theme(legend.position = "none") +
     xlab("Date of symptom onset") + ylab("Number of daily cases")
-  pdf(paste0(here::here("figure"), "/ensemble", i, ".pdf"),
-    width = 20 / 2.54, height = 10 / 2.54
+  png(paste0(here::here("figs"), "/ensemble", i, ".png"),
+    width = 20 / 2.54, height = 10 / 2.54, units="in", res=300
   )
   print(p)
-  crop::dev.off.crop()
+  dev.off()
 }
 ```
 
+![](figs/ensemble1.png)
 
-## Forecastability factors
+## Ensemble forecasts: Victoria
 
- 1. we have a good understanding of the factors that contribute to it, and can measure them.
- 2. there is lots of data available;
- 3. the future is somewhat similar to the past
- 4. the forecasts cannot affect the thing we are trying to forecast.
+![](figs/ensemble2.png)
 
+## Ensemble forecasts: Victoria
 
+![](figs/ensemble3.png)
+
+## Ensemble forecasts: Victoria
+
+![](figs/ensemble4.png)
+
+## Ensemble forecasts: Victoria
+
+![](figs/ensemble5.png)
+
+## Ensemble forecasts: Victoria
+
+![](figs/ensemble6.png)
+
+## Ensemble forecasts: Victoria
+
+![](figs/ensemble7.png)
 
 ## CRPS: Continuous Ranked Probability Score
 
@@ -1336,132 +1359,60 @@ crps |>
   scale_color_manual(values = c("#D55E00", "#0072B2", "#009E73", "#CC79A7"))
 ```
 
-\begin{textblock}{14.5}(0.5,8)
-\begin{block}{}
+::: aside
 For weekly forecasts created from 17 September 2020 to 15 June 2021
-\end{block}
-\end{textblock}
+:::
 
-# Forecasting many series
+## Australia vs US COVID forecasting
 
-## Forecasting many series
+:::: {.columns}
+::: {.column width=50%}
+::: {.callout-tip}
+# Australian Forecasting Panel
 
-```{r states1, echo=TRUE}
-cafe
-```
+* 3-5 models from selected teams
+* Fully probabilistic forecasts via simulated future sample paths
+* Equally weighted mixture distributions
+:::
+:::
+::: {.column width=50%}
+::: {.callout-note}
+# US COVID-19 Forecast Hub
 
-## Forecasting many series
+* 27-90 models from volunteer teams
+* Each team submitted a few quantiles or prediction intervals
+* Equally-weighted quantile combinations
 
-```{r states_plot2, include=FALSE}
-cafe |>
-  autoplot(Turnover) +
-  labs(
-    x = "Month",
-    y = "Turnover (A$million)",
-    title = "Australian monthly café turnover"
-  )
-```
+:::
+:::
+::::
 
-## Forecasting many series
+# Review paper
 
-```{r states2, echo=TRUE}
-cafe |>
-  filter(year(Month) <= 2017)
-```
+## Review paper
 
-## Forecasting many series
+![](figs/review_paper.png)
 
-```{r states3, echo=TRUE}
-cafe |>
-  filter(year(Month) <= 2017) |>
-  model(
-    ETS = ETS(Turnover),
-    ARIMA = ARIMA(Turnover ~ pdq(d=1) + PDQ(D=1)),
-    SNAIVE = SNAIVE(Turnover)
-  ) |>
-  mutate(
-    COMB = (ETS+ARIMA)/2
-  )
-```
+::: aside
+[robjhyndman.com/publications/combinations/](https://robjhyndman.com/publications/combinations/)
+:::
 
-## Forecasting many series
+## Review paper
 
-```{r states4, echo=TRUE}
-cafe |>
-  filter(year(Month) <= 2017) |>
-  model(
-    ETS = ETS(Turnover),
-    ARIMA = ARIMA(Turnover ~ pdq(d=1) + PDQ(D=1)),
-    SNAIVE = SNAIVE(Turnover)
-  ) |>
-  mutate(
-    COMB = (ETS+ARIMA)/2
-  ) |>
-  forecast(h = "2 years")
-```
+::: {.incremental}
+1. Continue to examine simple averaging
+2. Keep combinations sophisticatedly simple
+3. Develop statistical inference for combination forecasts
+4. Select forecasts to be combined
+5. Advance the theory of nonlinear combinations
+6. Focus on probabilistic forecast combinations
+7. Discuss if/how/when to interpret combination weights
+8. Take account of correlations between forecasts
+9. Use cross-learning and feature-engineering
+10. Encourage open-source software and data
+:::
 
-## Forecasting many series
-
-```{r states5, echo=TRUE}
-cafe |>
-  filter(year(Month) <= 2017) |>
-  model(
-    ETS = ETS(Turnover),
-    ARIMA = ARIMA(Turnover ~ pdq(d=1) + PDQ(D=1)),
-    SNAIVE = SNAIVE(Turnover)
-  ) |>
-  mutate(
-    COMB = (ETS+ARIMA)/2
-  ) |>
-  forecast(h = "2 years") |>
-  accuracy(data = cafe,
-    measures = list(crps=CRPS, rmse=RMSE)
-  )
-```
-
-## Forecasting many series
-
-```{r states6, echo=TRUE}
-cafe |>
-  filter(year(Month) <= 2017) |>
-  model(
-    ETS = ETS(Turnover),
-    ARIMA = ARIMA(Turnover ~ pdq(d=1) + PDQ(D=1)),
-    SNAIVE = SNAIVE(Turnover)
-  ) |>
-  mutate(
-    COMB = (ETS+ARIMA)/2
-  ) |>
-  forecast(h = "2 years") |>
-  accuracy(data = cafe,
-    measures = list(ss=skill_score(CRPS))
-  )
-```
-
-## Forecasting many series
-
-```{r states8, echo=TRUE}
-cafe |>
-  filter(year(Month) <= 2017) |>
-  model(
-    ETS = ETS(Turnover),
-    ARIMA = ARIMA(Turnover ~ pdq(d=1) + PDQ(D=1)),
-    SNAIVE = SNAIVE(Turnover)
-  ) |>
-  mutate(
-    COMB = (ETS+ARIMA)/2
-  ) |>
-  forecast(h = "2 years") |>
-  accuracy(data = cafe,
-    measures = list(ss=skill_score(CRPS))
-  ) |>
-  group_by(.model) |>
-  summarise(sspc = mean(ss) * 100)
-```
-
-Skill score is relative to seasonal naive forecasts
-
-# For more information
+## For more information
 
 **Slides:** [robjhyndman.com/seminars/uscdc2022](https://robjhyndman.com/seminars/uscdc2022)
 
@@ -1470,10 +1421,3 @@ Skill score is relative to seasonal naive forecasts
 
 `r fontawesome::fa("home")` [robjhyndman.com](https://robjhyndman.com)<br> `r fontawesome::fa("mastodon")` [\@robjhyndman\@aus.social](https://aus.social/@robjhyndman)<br> `r fontawesome::fa("github")` [\@robjhyndman](https://github.com/robjhyndman)<br> `r fontawesome::fa("envelope")` [rob.hyndman\@monash.edu](mailto:rob.hyndman@monash.edu)
 :::
-
-## Quantile forecasts
-
-```{r quantiles3, dependson='quantiles'}
-p1 +
-  geom_line(aes(y = Turnover), data = auscafe |> filter(year(Month) >= 2017))
-```
