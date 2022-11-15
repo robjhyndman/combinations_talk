@@ -1261,7 +1261,7 @@ cafe_accuracy
 
 ![](figs/covid.jpg)
 
-## Australian Health Protection Principal Committee
+## Australian Health Protection Principal Committee {.smaller}
 
 ::: {.callout-warning}
 ###
@@ -1502,6 +1502,12 @@ For weekly forecasts created from 17 September 2020 to 15 June 2021
 ## For more information
 
 **Slides:** [robjhyndman.com/seminars/uscdc2022](https://robjhyndman.com/seminars/uscdc2022)
+
+::: {.callout-warning}
+# Further resources
+* Packages: [tidyverts.org](https://tidyverts.org)
+* Forecasting textbook: [OTexts.com/fpp3](https://OTexts.com/fpp3)
+:::
 
 ::: {.callout-note icon="false"}
 # Find me at:
