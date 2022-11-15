@@ -1355,8 +1355,6 @@ localcases |>
 * Series with obvious anomalies removed.
 
 
-## Ensemble forecasts: Victoria
-
 ```{r combined_forecasts, eval=FALSE}
 # Read weekly samples files from outputs folder and save as rds file
 fs::dir_ls("../uncertain_futures/outputs", glob = "*.csv") |>
@@ -1412,31 +1410,15 @@ for (i in seq_along(origins)) {
 }
 ```
 
-![](figs/ensemble1.png)
+```{r}
+#| cache: false
+#| output: asis
 
-## Ensemble forecasts: Victoria
-
-![](figs/ensemble2.png)
-
-## Ensemble forecasts: Victoria
-
-![](figs/ensemble3.png)
-
-## Ensemble forecasts: Victoria
-
-![](figs/ensemble4.png)
-
-## Ensemble forecasts: Victoria
-
-![](figs/ensemble5.png)
-
-## Ensemble forecasts: Victoria
-
-![](figs/ensemble6.png)
-
-## Ensemble forecasts: Victoria
-
-![](figs/ensemble7.png)
+for(i in 1:7) {
+  cat("## Ensemble forecasts: Victoria")
+  print(glue::glue("\n\n![](figs/ensemble{i}.png)\n\n"))
+}
+```
 
 ## CRPS: Continuous Ranked Probability Score
 
