@@ -24,9 +24,7 @@ format:
       <script src="https://kit.fontawesome.com/0fba9333d8.js" crossorigin="anonymous"></script>
 monofont: "Hack FC Ligatured"
 callout-icon: false
-toc: true
-toc-depth: 1
-toc-title: Outline
+toc: false
 execute:
   cache: true
 editor_options:
