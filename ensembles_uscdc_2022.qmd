@@ -44,6 +44,9 @@ div.callout-warning {
 div.callout-important {
   border-left-color: #0063a7 !important;
 }
+div.callout-tip {
+  border-left-color: #1b5e20 !important;
+}
 ```
 
 ```{r setup, include=FALSE, cache=FALSE}
@@ -440,7 +443,6 @@ method not in danger of falling between two stools?” [*Maurice Priestley*]{.ri
 The first genuine forecasting competition
 
 ::: {.tightlist}
-
 - 1001 series from demography, industry, economics.
 - Highly controversial at the time.
 - Showed combinations out-performed individual methods
@@ -469,7 +471,6 @@ The first genuine forecasting competition
 The first genuine forecasting competition
 
 ::: {.tightlist}
-
 - 1001 series from demography, industry, economics.
 - Highly controversial at the time.
 - Showed combinations out-performed individual methods
@@ -507,7 +508,6 @@ The first genuine forecasting competition
 The first genuine forecasting competition
 
 ::: {.tightlist}
-
 - 1001 series from demography, industry, economics.
 - Highly controversial at the time.
 - Showed combinations out-performed individual methods
@@ -544,11 +544,13 @@ Researchers started to:
 ::: {.column width="50%"}
 
 ::: {.callout}
+::: {.tightlist}
 -   January -- May 2018
 -   100,000 time series: yearly, quarterly, monthly, weekly, daily, hourly.
 -   Point forecast and prediction intervals assessed.
 -   Code must be public
 -   248 registrations, 50 submissions.
+:::
 :::
 
 :::
@@ -568,11 +570,13 @@ Researchers started to:
 ::: {.column width="50%"}
 
 ::: {.callout}
+::: {.tightlist}
 -   January -- May 2018
 -   100,000 time series: yearly, quarterly, monthly, weekly, daily, hourly.
 -   Point forecast and prediction intervals assessed.
 -   Code must be public
 -   248 registrations, 50 submissions.
+:::
 :::
 
 ::: {.callout-important}
@@ -758,25 +762,6 @@ Montero-Manso, Athanasopoulos, Hyndman & Talagala (IJF 2020) "FFORMA: Feature-ba
 ```{r fforma_flowchart}
 svgPanZoom::svgPanZoom(svgtools::read_svg("figs/fforma-flowchart.svg"), width="100%", height="100%")
 ```
-
-
-## FFORMA: [Feature-based FORecast Model Averaging]{style="font-size: 65%;"} {.smaller}
-
-::: {.callout-note}
-#
-1. Metalearner: 100,000 series from M4 competition.
-2. For each series produce forecasts from 8 different models.
-3. For each series compute a large number of features (e.g., length, strength of seasonality, strength of trend, spectral entropy, autocorrelations, Hurst exponent, unit root test statistics, etc.
-4. Train xgboost to learn weights of forecast combination using features as inputs.
-:::
-
-. . .
-
-::: {.tightlist}
- * The probability of each model being best is used to construct a model weight.
- * A combination forecast is produced using these weights.
- * The model for weights can be applied to other series not contained in the M4 competition.
-:::
 
 ## R Packages
 
@@ -1273,7 +1258,7 @@ cafe_accuracy
 
 ![](figs/covid.jpg)
 
-## Australian Health Protection Principal Committee {.smaller}
+## Australian Health Protection Principal Committee
 
 ::: {.callout-warning}
 ###

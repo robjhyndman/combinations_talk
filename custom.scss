@@ -31,17 +31,12 @@ div.callout-important.callout-style-default .callout-caption {
 div.callout-note.callout-style-default .callout-caption {
   background-color: #a1b8c8 !important;
 }
-div.callout-note.callout-style-default .callout-body {
-  font-size: 36px !important;
-}
 div.callout-warning.callout-style-default .callout-caption {
   background-color: #c8ada1 !important;
 }
-
-div.callout-warning.callout-style-default .callout-body {
-  font-size: 36px !important;
+div.callout-tip.callout-style-default .callout-caption {
+  background-color: #87AA89 !important;
 }
-
 
 // headers
 .reveal h3 {
