@@ -19,7 +19,7 @@ format:
     title-slide-attributes:
       data-background-image: "figs/cover.png"
       data-background-size: "100% 20%"
-      data-background-position: "0% 60%"
+      data-background-position: "0% 50%"
     include-after: |
       <script src="https://kit.fontawesome.com/0fba9333d8.js" crossorigin="anonymous"></script>
 monofont: "Hack FC Ligatured"
@@ -236,6 +236,7 @@ p1 +
   ) +
   annotate("text", x=as.Date("2019-06-01"), y=3200, label="ETS futures")
 ```
+
 
 ## Australian monthly café turnover
 
@@ -804,7 +805,7 @@ p <- auscafe |>
   autoplot(Turnover) +
   labs(x = "Month", y = "Turnover (A$million)") +
   guides(colour = guide_legend("Model")) +
-  ylim(2800, 4850)
+  ylim(2800, max(future$.sim))
 p1 <- p +
   geom_line(
     data = future |> filter(.model=="arima") |> mutate(modrep = paste0(.model, .rep)),
@@ -831,6 +832,17 @@ p4 <- p +
   scale_color_manual(values = c(arima = "#D55E00", ets = "#0072B2", snaive = "#009E73"))
 p <- patchwork::align_patches(p1,p2,p3,p4)
 p[[1]]
+```
+
+
+```{r}
+ggsave("figs/cover.png",
+  plot = p4 +
+  theme_void() +
+    labs(x="",y="",title="") +
+    guides(col="none"),
+  device="png",
+  width=12, height=2)
 ```
 
 
