@@ -1476,7 +1476,9 @@ For weekly forecasts created from 17 September 2020 to 15 June 2021
 
 ## Review paper
 
-![](figs/review_paper.png)
+<center>
+<img src="figs/review_paper.png" width="85%">
+</center>
 
 ::: aside
 [robjhyndman.com/publications/combinations/](https://robjhyndman.com/publications/combinations/)
